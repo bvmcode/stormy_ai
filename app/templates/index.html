@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Stormy AI — Weather Briefing{% endblock %}
+
+{% block content %}
+<section class="panel hero-panel">
+  <h1>Get a weather briefing</h1>
+  <p class="lede">
+    Enter a city and state. Stormy AI geocodes the location, pulls live radar,
+    lightning, model guidance, soundings, alerts, and forecast data, then writes
+    a structured briefing with a radar plot.
+  </p>
+
+  <form
+    id="briefing-form"
+    class="briefing-form"
+    method="post"
+    action="{{ url_for('briefing') }}"
+  >
+    <div class="field-row">
+      <label class="field">
+        <span>City</span>
+        <input
+          type="text"
+          name="city"
+          placeholder="Atco"
+          required
+          autocomplete="address-level2"
+        />
+      </label>
+
+      <label class="field">
+        <span>State</span>
+        <input
+          type="text"
+          name="state"
+          placeholder="NJ"
+          maxlength="2"
+          pattern="[A-Za-z]{2}"
+          title="Two-letter state abbreviation"
+          required
+          autocomplete="address-level1"
+        />
+      </label>
+    </div>
+
+    <button id="submit-button" class="primary-button" type="submit">
+      Generate briefing
+    </button>
+
+    <p id="loading-message" class="loading-message" hidden>
+      Generating briefing. This may take several minutes while radar and model
+      data are fetched…
+    </p>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const form = document.getElementById("briefing-form");
+  const button = document.getElementById("submit-button");
+  const loadingMessage = document.getElementById("loading-message");
+
+  form.addEventListener("submit", () => {
+    button.disabled = true;
+    button.textContent = "Generating…";
+    loadingMessage.hidden = false;
+  });
+</script>
+{% endblock %}

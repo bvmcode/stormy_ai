@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Stormy AI — {{ location }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="briefing-header">
+    <div>
+      <p class="eyebrow">
+        Weather briefing
+      </p>
+      <h1>{{ location }}</h1>
+    </div>
+    <a class="secondary-button" href="{{ url_for('index') }}">New briefing</a>
+  </div>
+
+  {% if error %}
+  <div class="error-banner">
+    <strong>Unable to generate briefing.</strong>
+    <p>{{ error }}</p>
+  </div>
+  {% else %}
+  {% if radar_plot_url %}
+  <figure class="radar-figure">
+    <img src="{{ radar_plot_url }}" alt="NEXRAD radar plot for {{ location }}" />
+    <figcaption>Latest NEXRAD reflectivity near {{ location }}</figcaption>
+  </figure>
+  {% endif %}
+
+  <article class="briefing-body">
+    {{ briefing_html | safe }}
+  </article>
+  {% endif %}
+</section>
+{% endblock %}

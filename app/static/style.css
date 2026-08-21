@@ -1,0 +1,265 @@
+:root {
+  color-scheme: dark;
+  --bg: #07111f;
+  --bg-panel: rgba(12, 24, 42, 0.92);
+  --bg-panel-border: rgba(148, 163, 184, 0.18);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --danger: #f87171;
+  --shadow: 0 24px 80px rgba(2, 6, 23, 0.45);
+  --radius: 18px;
+  --max-width: 960px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(14, 165, 233, 0.18), transparent 32%),
+    linear-gradient(180deg, #0b172a 0%, var(--bg) 100%);
+}
+
+.page {
+  width: min(calc(100% - 2rem), var(--max-width));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.site-header {
+  margin-bottom: 1.5rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.16);
+  font-size: 1.4rem;
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.brand-tagline {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.panel {
+  padding: 1.75rem;
+  border: 1px solid var(--bg-panel-border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.hero-panel h1,
+.briefing-header h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.briefing-form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.field,
+.briefing-type {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span,
+.briefing-type legend {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text);
+  font: inherit;
+}
+
+.field input:focus {
+  outline: 2px solid rgba(56, 189, 248, 0.35);
+  border-color: var(--accent);
+}
+
+.briefing-type {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.radio-option {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.radio-option + .radio-option {
+  margin-top: 0.65rem;
+}
+
+.radio-option strong {
+  display: block;
+}
+
+.radio-option small {
+  color: var(--muted);
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 1.2rem;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #04111f;
+}
+
+.primary-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.secondary-button {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: transparent;
+  color: var(--text);
+}
+
+.loading-message {
+  margin: 0;
+  color: var(--muted);
+}
+
+.briefing-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.radar-figure {
+  margin: 0 0 1.5rem;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.radar-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.radar-figure figcaption {
+  padding: 0.75rem 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.briefing-body {
+  line-height: 1.65;
+}
+
+.briefing-body h2,
+.briefing-body h3 {
+  margin-top: 1.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.briefing-body p,
+.briefing-body ul {
+  margin-top: 0;
+  margin-bottom: 0.9rem;
+}
+
+.briefing-body ul {
+  padding-left: 1.2rem;
+}
+
+.error-banner {
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.25);
+}
+
+.error-banner p {
+  margin: 0.35rem 0 0;
+}
+
+@media (max-width: 720px) {
+  .field-row,
+  .briefing-header {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}
