@@ -37,7 +37,7 @@ def _qv_value(quantity) -> float | None:
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -174,8 +174,7 @@ class NwsApi:
         pop = _pop_percent(period)
         start = _format_local_timestamp(period.get("startTime"))
         wind = (
-            f"{period.get('windSpeed', 'unknown')} "
-            f"{period.get('windDirection') or ''}"
+            f"{period.get('windSpeed', 'unknown')} " f"{period.get('windDirection') or ''}"
         ).strip()
         return (
             f"{start} | {period.get('temperature')}°"
@@ -268,9 +267,7 @@ class NwsApi:
         distance_m = _qv_value(station_props.get("distance"))
         elevation_m = _qv_value(station_props.get("elevation") or obs.get("elevation"))
         elevation = (
-            f"{_m_to_feet(elevation_m):.0f} ft"
-            if elevation_m is not None
-            else "Not reported"
+            f"{_m_to_feet(elevation_m):.0f} ft" if elevation_m is not None else "Not reported"
         )
         heat_index = _qv_value(obs.get("heatIndex"))
         wind_chill = _qv_value(obs.get("windChill"))
@@ -287,8 +284,7 @@ class NwsApi:
             f"Elevation: {elevation}",
             f"Observed at: {_format_local_timestamp(obs.get('timestamp'))}",
             f"Conditions: {obs.get('textDescription') or 'Not reported'}",
-            "Present weather: "
-            f"{self._format_present_weather(obs.get('presentWeather'))}",
+            "Present weather: " f"{self._format_present_weather(obs.get('presentWeather'))}",
             f"Temperature: {_format_temp(obs.get('temperature'))}",
             f"Dewpoint: {_format_temp(obs.get('dewpoint'))}",
             f"Relative humidity: {_format_percent(obs.get('relativeHumidity'))}",
@@ -303,12 +299,9 @@ class NwsApi:
             ),
             f"Visibility: {self._format_visibility(obs.get('visibility'))}",
             f"Clouds: {self._format_cloud_layers(obs.get('cloudLayers'))}",
-            "Precipitation last hour: "
-            f"{_format_precip(obs.get('precipitationLastHour'))}",
-            "Precipitation last 3 hours: "
-            f"{_format_precip(obs.get('precipitationLast3Hours'))}",
-            "Precipitation last 6 hours: "
-            f"{_format_precip(obs.get('precipitationLast6Hours'))}",
+            "Precipitation last hour: " f"{_format_precip(obs.get('precipitationLastHour'))}",
+            "Precipitation last 3 hours: " f"{_format_precip(obs.get('precipitationLast3Hours'))}",
+            "Precipitation last 6 hours: " f"{_format_precip(obs.get('precipitationLast6Hours'))}",
             "Max temperature last 24 hours: "
             f"{_format_temp(obs.get('maxTemperatureLast24Hours'))}",
             "Min temperature last 24 hours: "
@@ -358,17 +351,12 @@ class NwsApi:
 
         if hourly_url:
             hourly_data = self._get(hourly_url)
-            hourly_periods = (
-                (hourly_data or {}).get("properties") or {}
-            ).get("periods") or []
+            hourly_periods = ((hourly_data or {}).get("properties") or {}).get("periods") or []
             if hourly_periods:
                 hourly_lines = [
-                    self._format_hourly_period(period)
-                    for period in hourly_periods[:72]
+                    self._format_hourly_period(period) for period in hourly_periods[:72]
                 ]
-                sections.append(
-                    "Hourly forecast (next 72 hours):\n" + "\n".join(hourly_lines)
-                )
+                sections.append("Hourly forecast (next 72 hours):\n" + "\n".join(hourly_lines))
 
         return "\n\n".join(sections)
 
@@ -379,9 +367,7 @@ class NwsApi:
             latitude: Latitude of the location (e.g. 40.7128 for New York).
             longitude: Longitude of the location (e.g. -74.0060 for New York).
         """
-        alerts_url = (
-            f"{self.BASE_URL}/alerts/active?point={latitude:.4f},{longitude:.4f}"
-        )
+        alerts_url = f"{self.BASE_URL}/alerts/active?point={latitude:.4f},{longitude:.4f}"
         alerts_data = self._get(alerts_url)
         if not alerts_data:
             return "Unable to fetch alerts for this location."
@@ -419,9 +405,7 @@ class NwsApi:
         if not points_data:
             return "Unable to fetch current conditions for this location."
 
-        stations_url = (points_data.get("properties") or {}).get(
-            "observationStations"
-        )
+        stations_url = (points_data.get("properties") or {}).get("observationStations")
         if not stations_url:
             return "No observation stations were found for this location."
 
@@ -432,15 +416,11 @@ class NwsApi:
 
         tried = []
         for station in stations[:5]:
-            station_id = (station.get("properties") or {}).get(
-                "stationIdentifier"
-            )
+            station_id = (station.get("properties") or {}).get("stationIdentifier")
             if not station_id:
                 continue
             tried.append(station_id)
-            observation = self._get(
-                f"{self.BASE_URL}/stations/{station_id}/observations/latest"
-            )
+            observation = self._get(f"{self.BASE_URL}/stations/{station_id}/observations/latest")
             if not observation:
                 continue
             return self._format_observation(station, observation)
@@ -478,18 +458,12 @@ class NwsApi:
             )
             graph = (listing or {}).get("@graph") or []
             if not graph:
-                return (
-                    f"No Area Forecast Discussion is available for office {cwa}."
-                )
-            product_url = graph[0].get("@id") or (
-                f"{self.BASE_URL}/products/{graph[0].get('id')}"
-            )
+                return f"No Area Forecast Discussion is available for office {cwa}."
+            product_url = graph[0].get("@id") or (f"{self.BASE_URL}/products/{graph[0].get('id')}")
             product = self._get(product_url, accept="application/ld+json")
 
         if not product:
-            return (
-                f"Unable to fetch the Area Forecast Discussion for office {cwa}."
-            )
+            return f"Unable to fetch the Area Forecast Discussion for office {cwa}."
 
         text = (product.get("productText") or "").strip()
         if not text:
@@ -498,12 +472,7 @@ class NwsApi:
         office = product.get("issuingOffice") or cwa
         issued = _format_local_timestamp(product.get("issuanceTime"))
         name = product.get("productName") or "Area Forecast Discussion"
-        return (
-            f"Product: {name}\n"
-            f"Office: {office}\n"
-            f"Issued: {issued}\n\n"
-            f"{text}"
-        )
+        return f"Product: {name}\n" f"Office: {office}\n" f"Issued: {issued}\n\n" f"{text}"
 
 
 nws_api = NwsApi()

@@ -5,7 +5,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import xarray as xr
-
 from herbie import Herbie, HerbieLatest
 from langchain.tools import tool
 from pydantic import BaseModel, Field
@@ -194,10 +193,7 @@ def nearest_grid_index(
 
     delta_lon_rad = np.radians(delta_lon)
 
-    a = (
-        np.sin(delta_lat / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon_rad / 2) ** 2
-    )
+    a = np.sin(delta_lat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon_rad / 2) ** 2
 
     a = np.clip(
         a,
@@ -224,9 +220,7 @@ def nearest_grid_index(
     dims = lat_coord.dims
 
     if len(dims) != 2:
-        raise ValueError(
-            "Expected a 2-D HRRR latitude grid, " f"but got dimensions {dims}"
-        )
+        raise ValueError("Expected a 2-D HRRR latitude grid, " f"but got dimensions {dims}")
 
     indexers = {
         dims[0]: int(grid_index[0]),
@@ -382,9 +376,7 @@ def load_pressure_profile(
             break
 
     if pressure_coord is None:
-        raise ValueError(
-            "Could not find pressure coordinate " "in HRRR pressure profile."
-        )
+        raise ValueError("Could not find pressure coordinate " "in HRRR pressure profile.")
 
     pressures = np.asarray(
         point[pressure_coord].values,
@@ -536,17 +528,13 @@ def diagnose_thermal_profile(
         return empty_result
 
     temperatures = [
-        level["temperature_c"]
-        for level in profile
-        if level["temperature_c"] is not None
+        level["temperature_c"] for level in profile if level["temperature_c"] is not None
     ]
 
     if not temperatures:
         return empty_result
 
-    surface_subfreezing = (
-        surface_temperature_c is not None and surface_temperature_c <= 0
-    )
+    surface_subfreezing = surface_temperature_c is not None and surface_temperature_c <= 0
 
     # --------------------------------------------------------
     # Count crossings of the 0 C level
@@ -585,9 +573,7 @@ def diagnose_thermal_profile(
     # Fully subfreezing profile
     # --------------------------------------------------------
 
-    entire_profile_below_freezing = surface_subfreezing and all(
-        temp <= 0 for temp in temperatures
-    )
+    entire_profile_below_freezing = surface_subfreezing and all(temp <= 0 for temp in temperatures)
 
     return {
         "surface_subfreezing": surface_subfreezing,
@@ -727,10 +713,7 @@ def _safe_pressure_profile(
 
 
 def _profile_lookup(profile: list[dict]) -> dict[float, float]:
-    return {
-        round(item["pressure_hpa"], 1): item["value"]
-        for item in profile
-    }
+    return {round(item["pressure_hpa"], 1): item["value"] for item in profile}
 
 
 def kelvin_to_celsius(value: float | None) -> float | None:
@@ -808,9 +791,7 @@ def load_hrrr_sounding(
     )
 
     surface_pressure_hpa = (
-        surface_pressure["value"] / 100.0
-        if surface_pressure["value"] is not None
-        else None
+        surface_pressure["value"] / 100.0 if surface_pressure["value"] is not None else None
     )
 
     tmp_profile = _safe_pressure_profile(hrrr_prs, "TMP", latitude, longitude)
@@ -843,10 +824,7 @@ def load_hrrr_sounding(
         )
 
     for pressure in pressures:
-        if (
-            surface_pressure_hpa is not None
-            and pressure > surface_pressure_hpa + 2
-        ):
+        if surface_pressure_hpa is not None and pressure > surface_pressure_hpa + 2:
             continue
 
         temperature_c = kelvin_to_celsius(tmp_lookup.get(pressure))
@@ -913,8 +891,7 @@ class HRRREnvironmentInput(BaseModel):
         ge=0,
         le=18,
         description=(
-            "HRRR forecast lead time in hours. "
-            "Use 0 for the latest available HRRR analysis."
+            "HRRR forecast lead time in hours. " "Use 0 for the latest available HRRR analysis."
         ),
     )
 
@@ -1002,9 +979,7 @@ def get_hrrr_environment(
         longitude,
     )
 
-    temperature_c = (
-        temperature["value"] - 273.15 if temperature["value"] is not None else None
-    )
+    temperature_c = temperature["value"] - 273.15 if temperature["value"] is not None else None
 
     # ========================================================
     # 2-m dewpoint
@@ -1036,9 +1011,7 @@ def get_hrrr_environment(
         longitude,
     )
 
-    surface_pressure_hpa = (
-        pressure["value"] / 100.0 if pressure["value"] is not None else None
-    )
+    surface_pressure_hpa = pressure["value"] / 100.0 if pressure["value"] is not None else None
 
     # ========================================================
     # HRRR precipitation rate
@@ -1133,9 +1106,7 @@ def get_hrrr_environment(
         longitude,
     )
 
-    freezing_level_m_msl = (
-        freezing_level["value"] if freezing_level["value"] is not None else None
-    )
+    freezing_level_m_msl = freezing_level["value"] if freezing_level["value"] is not None else None
 
     # ========================================================
     # CAPE / CIN
@@ -1227,9 +1198,7 @@ def get_hrrr_environment(
         "cin": cin,
     }
 
-    missing_fields = [
-        name for name, result in field_results.items() if result["value"] is None
-    ]
+    missing_fields = [name for name, result in field_results.items() if result["value"] is None]
 
     grid_distances = [
         result["grid_distance_km"]

@@ -20,6 +20,10 @@ def main() -> None:
     result = run_briefing(args.location)
     print(result["briefing"])
     print(f"\nWrote {result['briefing_path']}")
+    if result.get("briefing_s3_uri"):
+        print(f"Uploaded {result['briefing_s3_uri']}")
+    elif result.get("briefing_s3_upload_error"):
+        print(f"S3 upload failed: {result['briefing_s3_upload_error']}")
 
 
 if __name__ == "__main__":

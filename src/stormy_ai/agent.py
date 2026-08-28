@@ -1,21 +1,7 @@
 from __future__ import annotations
 
-import ast
+import gc
 import json
-import os
-
-from typing_extensions import NotRequired
-
-from langgraph.graph import (
-    StateGraph,
-    START,
-    MessagesState,
-)
-
-from langgraph.prebuilt import (
-    ToolNode,
-    tools_condition,
-)
 
 from langchain_core.messages import (
     AIMessage,
@@ -23,19 +9,22 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
+from langgraph.graph import (
+    START,
+    MessagesState,
+    StateGraph,
+)
+from langgraph.prebuilt import (
+    ToolNode,
+    tools_condition,
+)
+from typing_extensions import NotRequired
 
-from langchain_ollama import ChatOllama
-
+from stormy_ai.diagnostics import diagnose_precipitation
+from stormy_ai.llm import create_chat_model
 from stormy_ai.prompts import SYSTEM_PROMPT
 from stormy_ai.tools import tools
-
-# Put diagnose_precipitation wherever you keep your
-# deterministic meteorological analysis functions.
-from stormy_ai.diagnostics import diagnose_precipitation
-
-# =========================================================
-# 1. GRAPH STATE
-# =========================================================
+from stormy_ai.utils import parse_tool_content
 
 
 class WeatherState(MessagesState):
@@ -58,27 +47,20 @@ class WeatherState(MessagesState):
     diagnosis: NotRequired[dict | None]
 
 
-# =========================================================
-# 2. CREATE THE LOCAL LANGUAGE MODEL
-# =========================================================
-
-model = ChatOllama(
-    model=os.environ.get("OLLAMA_MODEL", "gemma4:latest"),
-    base_url=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-    temperature=0,
-)
-
-# This version of the model is allowed to call tools.
+model = create_chat_model()
 model_with_tools = model.bind_tools(tools)
+_tool_node = ToolNode(tools)
 
 
-# =========================================================
-# 3. TOOL NAME -> STATE FIELD
-# =========================================================
+def run_tools(state: WeatherState):
+    """Execute tool calls and release large intermediate allocations."""
+
+    result = _tool_node.invoke(state)
+    gc.collect()
+    return result
 
 # These are the tools whose output should be captured
 # for deterministic precipitation diagnosis.
-#
 # plot_nexrad_level2 is intentionally NOT here because
 # a PNG path isn't part of the meteorological diagnosis.
 
@@ -88,11 +70,6 @@ WEATHER_TOOL_STATE_MAP = {
     "get_hrrr_environment": "hrrr",
     "get_lightning": "lightning",
 }
-
-
-# =========================================================
-# 4. RESET WEATHER STATE FOR EACH NEW USER TURN
-# =========================================================
 
 
 def reset_weather_state(
@@ -114,115 +91,6 @@ def reset_weather_state(
         "lightning": None,
         "diagnosis": None,
     }
-
-
-# =========================================================
-# 5. TOOL MESSAGE PARSING
-# =========================================================
-
-
-def parse_tool_content(
-    content,
-) -> dict | None:
-    """
-    Convert ToolMessage content back into a dictionary.
-
-    LangChain serializes dictionary tool outputs before
-    placing them in ToolMessage content.
-
-    This helper handles:
-        - dict
-        - JSON string
-        - Python-dict-style string
-        - text content blocks
-    """
-
-    # Already structured.
-    if isinstance(
-        content,
-        dict,
-    ):
-        return content
-
-    # -----------------------------------------------------
-    # String
-    # -----------------------------------------------------
-
-    if isinstance(
-        content,
-        str,
-    ):
-
-        # First try proper JSON.
-        try:
-
-            parsed = json.loads(content)
-
-            if isinstance(
-                parsed,
-                dict,
-            ):
-                return parsed
-
-        except json.JSONDecodeError:
-            pass
-
-        # Some tool implementations may result in
-        # Python repr-style dictionaries.
-        try:
-
-            parsed = ast.literal_eval(content)
-
-            if isinstance(
-                parsed,
-                dict,
-            ):
-                return parsed
-
-        except (
-            ValueError,
-            SyntaxError,
-        ):
-            pass
-
-        return None
-
-    # -----------------------------------------------------
-    # Content blocks
-    # -----------------------------------------------------
-
-    if isinstance(
-        content,
-        list,
-    ):
-
-        text_parts = []
-
-        for block in content:
-
-            if not isinstance(
-                block,
-                dict,
-            ):
-                continue
-
-            if block.get("type") == "text":
-
-                text = block.get("text")
-
-                if text:
-                    text_parts.append(text)
-
-        if text_parts:
-
-            return parse_tool_content("\n".join(text_parts))
-
-    return None
-
-
-# =========================================================
-# 6. FIND TOOL NAME
-# =========================================================
 
 
 def get_tool_message_name(
@@ -513,7 +381,7 @@ builder.add_node(
 
 builder.add_node(
     "tools",
-    ToolNode(tools),
+    run_tools,
 )
 
 builder.add_node(
@@ -575,10 +443,5 @@ builder.add_edge(
     "collect_weather",
     "agent",
 )
-
-
-# =========================================================
-# 14. COMPILE
-# =========================================================
 
 graph = builder.compile()

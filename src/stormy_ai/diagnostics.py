@@ -616,8 +616,7 @@ def diagnose_precip_type(
     if entire_frozen is True and flags["snow"] is True:
 
         reasoning.append(
-            "HRRR indicates snow and the sampled "
-            "thermal column is entirely below freezing."
+            "HRRR indicates snow and the sampled " "thermal column is entirely below freezing."
         )
 
         return (
@@ -630,11 +629,7 @@ def diagnose_precip_type(
     # Freezing rain
     # --------------------------------------------------------
 
-    if (
-        surface_subfreezing is True
-        and warm_nose is True
-        and flags["freezing_rain"] is True
-    ):
+    if surface_subfreezing is True and warm_nose is True and flags["freezing_rain"] is True:
 
         reasoning.append(
             "The surface is below freezing, an above-freezing "
@@ -655,8 +650,7 @@ def diagnose_precip_type(
     if surface_subfreezing is True and flags["ice_pellets"] is True:
 
         reasoning.append(
-            "HRRR categorical guidance indicates ice pellets "
-            "with a subfreezing surface."
+            "HRRR categorical guidance indicates ice pellets " "with a subfreezing surface."
         )
 
         return (
@@ -694,9 +688,7 @@ def diagnose_precip_type(
         "mixed",
     }:
 
-        reasoning.append(
-            f"HRRR categorical precipitation guidance " f"indicates {model_type}."
-        )
+        reasoning.append(f"HRRR categorical precipitation guidance " f"indicates {model_type}.")
 
         return (
             model_type,
@@ -914,11 +906,7 @@ def diagnose_virga_potential(
 
     dry_surface_layer = dewpoint_depression is not None and dewpoint_depression >= 10
 
-    possible = (
-        radar_echo_nearby
-        and dry_surface_layer
-        and not mrms["precipitation_at_location"]
-    )
+    possible = radar_echo_nearby and dry_surface_layer and not mrms["precipitation_at_location"]
 
     return {
         "possible": possible,
@@ -1097,9 +1085,7 @@ def diagnose_precipitation(
 
     if precipitation_at_location:
 
-        evidence.append(
-            (f"MRMS detects precipitation at the location " f"at {point_rate} mm/hr.")
-        )
+        evidence.append((f"MRMS detects precipitation at the location " f"at {point_rate} mm/hr."))
 
     elif precipitation_nearby:
 
@@ -1112,9 +1098,7 @@ def diagnose_precipitation(
 
     else:
 
-        evidence.append(
-            ("MRMS does not detect surface precipitation " "within the analysis area.")
-        )
+        evidence.append(("MRMS does not detect surface precipitation " "within the analysis area."))
 
     if mrms["nearest_surface_precip_km"] is not None:
 
@@ -1127,9 +1111,7 @@ def diagnose_precipitation(
 
     if mrms["nearest_radar_echo_km"] is not None:
 
-        evidence.append(
-            ("Nearest MRMS radar echo is " f"{mrms['nearest_radar_echo_km']} km away.")
-        )
+        evidence.append(("Nearest MRMS radar echo is " f"{mrms['nearest_radar_echo_km']} km away."))
 
     evidence.extend(type_reasoning)
 
@@ -1146,10 +1128,7 @@ def diagnose_precipitation(
     if nexrad.get("max_reflectivity_dbz") is not None:
 
         evidence.append(
-            (
-                "NEXRAD Level II maximum reflectivity "
-                f"is {nexrad['max_reflectivity_dbz']} dBZ."
-            )
+            ("NEXRAD Level II maximum reflectivity " f"is {nexrad['max_reflectivity_dbz']} dBZ.")
         )
 
     # --------------------------------------------------------
@@ -1214,10 +1193,7 @@ def diagnose_precipitation(
         },
         "evidence": evidence,
         "limitations": [
-            (
-                "MRMS is used as the primary observation "
-                "for current surface precipitation rate."
-            ),
+            ("MRMS is used as the primary observation " "for current surface precipitation rate."),
             (
                 "HRRR precipitation type is model guidance "
                 "and is not a direct surface observation."

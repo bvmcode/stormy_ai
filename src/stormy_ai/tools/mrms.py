@@ -1,17 +1,17 @@
-from langchain_core.tools import tool
-from pydantic import BaseModel, Field
-
-
-from datetime import datetime, timezone, timedelta
 import gzip
 import json
 import os
 import re
+import shutil
 import tempfile
+import gc
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import s3fs
 import xarray as xr
+from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 
 # ============================================================
 # Configuration
@@ -88,26 +88,15 @@ def get_mrms_data(
         "rb",
     ) as s3_file:
 
-        compressed_data = s3_file.read()
+        with tempfile.NamedTemporaryFile(
+            suffix=".grib2",
+            delete=False,
+        ) as tmp:
 
-    # --------------------------------------------------------
-    # Decompress gzip
-    # --------------------------------------------------------
+            with gzip.GzipFile(fileobj=s3_file) as gz:
+                shutil.copyfileobj(gz, tmp)
 
-    grib_data = gzip.decompress(compressed_data)
-
-    # --------------------------------------------------------
-    # cfgrib expects a local GRIB file
-    # --------------------------------------------------------
-
-    with tempfile.NamedTemporaryFile(
-        suffix=".grib2",
-        delete=False,
-    ) as tmp:
-
-        tmp.write(grib_data)
-
-        temp_filename = tmp.name
+            temp_filename = tmp.name
 
     try:
 
@@ -325,10 +314,7 @@ def calculate_distance_grid(
 
     delta_lon = lon2 - lon1
 
-    a = (
-        np.sin(delta_lat / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon / 2) ** 2
-    )
+    a = np.sin(delta_lat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon / 2) ** 2
 
     c = 2 * np.arctan2(
         np.sqrt(a),
@@ -431,9 +417,7 @@ def nearest_threshold_distance(
 
         valid_mask &= values >= minimum_valid_value
 
-    threshold_mask = (
-        valid_mask & (values >= threshold) & (distances <= search_radius_km)
-    )
+    threshold_mask = valid_mask & (values >= threshold) & (distances <= search_radius_km)
 
     if not np.any(threshold_mask):
         return None
@@ -706,50 +690,12 @@ def get_mrms_precipitation_analysis(
 
     precip_da, precip_file = get_mrms_data(PRECIP_PRODUCT)
 
-    # --------------------------------------------------------
-    # Load composite reflectivity
-    # --------------------------------------------------------
-
-    print("\nDownloading MRMS Reflectivity...")
-
-    reflectivity_da, reflectivity_file = get_mrms_data(REFLECTIVITY_PRODUCT)
-
-    # --------------------------------------------------------
-    # Analyze requested radius
-    # --------------------------------------------------------
-
     precip = analyze_precip_rate(
         da=precip_da,
         latitude=latitude,
         longitude=longitude,
         radius_km=radius_km,
     )
-
-    reflectivity = analyze_reflectivity(
-        da=reflectivity_da,
-        latitude=latitude,
-        longitude=longitude,
-        radius_km=radius_km,
-    )
-
-    # --------------------------------------------------------
-    # Nearest meaningful radar echo
-    # --------------------------------------------------------
-
-    nearest_echo_km = nearest_threshold_distance(
-        da=reflectivity_da,
-        latitude=latitude,
-        longitude=longitude,
-        # Consider >= 10 dBZ a meaningful echo.
-        threshold=10.0,
-        search_radius_km=nearest_search_radius_km,
-        # Ignore -99/no-data.
-        minimum_valid_value=-90.0,
-    )
-
-    # --------------------------------------------------------
-    # Nearest surface precipitation
-    # --------------------------------------------------------
 
     nearest_precip_km = nearest_threshold_distance(
         da=precip_da,
@@ -762,31 +708,44 @@ def get_mrms_precipitation_analysis(
         minimum_valid_value=0.0,
     )
 
-    # --------------------------------------------------------
-    # CONUS diagnostic
-    # --------------------------------------------------------
-
     conus_precip_values = precip_da.values
-
     conus_precip_values = conus_precip_values[np.isfinite(conus_precip_values)]
-
     conus_precip_values = conus_precip_values[conus_precip_values >= 0]
 
     if len(conus_precip_values):
-
         conus_max_precip = float(np.max(conus_precip_values))
-
     else:
-
         conus_max_precip = None
 
-    # --------------------------------------------------------
-    # Interpretation
-    # --------------------------------------------------------
+    del precip_da, conus_precip_values
+    gc.collect()
 
-    precip_here = (
-        precip["point_rate_mm_hr"] is not None and precip["point_rate_mm_hr"] >= 0.1
+    print("\nDownloading MRMS Reflectivity...")
+
+    reflectivity_da, reflectivity_file = get_mrms_data(REFLECTIVITY_PRODUCT)
+
+    reflectivity = analyze_reflectivity(
+        da=reflectivity_da,
+        latitude=latitude,
+        longitude=longitude,
+        radius_km=radius_km,
     )
+
+    nearest_echo_km = nearest_threshold_distance(
+        da=reflectivity_da,
+        latitude=latitude,
+        longitude=longitude,
+        # Consider >= 10 dBZ a meaningful echo.
+        threshold=10.0,
+        search_radius_km=nearest_search_radius_km,
+        # Ignore -99/no-data.
+        minimum_valid_value=-90.0,
+    )
+
+    del reflectivity_da
+    gc.collect()
+
+    precip_here = precip["point_rate_mm_hr"] is not None and precip["point_rate_mm_hr"] >= 0.1
 
     precip_nearby = precip["precipitating_grid_cells"] > 0
 
@@ -794,9 +753,7 @@ def get_mrms_precipitation_analysis(
 
     if precip_here:
 
-        interpretation = (
-            "MRMS indicates precipitation is occurring " "at the requested location."
-        )
+        interpretation = "MRMS indicates precipitation is occurring " "at the requested location."
 
     elif precip_nearby:
 
@@ -924,12 +881,6 @@ def get_mrms_precipitation(
 
     precip_da, precip_file = get_mrms_data(PRECIP_PRODUCT)
 
-    reflectivity_da, reflectivity_file = get_mrms_data(REFLECTIVITY_PRODUCT)
-
-    # --------------------------------------------------------
-    # Analyze requested radius
-    # --------------------------------------------------------
-
     precip = analyze_precip_rate(
         da=precip_da,
         latitude=latitude,
@@ -937,32 +888,9 @@ def get_mrms_precipitation(
         radius_km=radius_km,
     )
 
-    reflectivity = analyze_reflectivity(
-        da=reflectivity_da,
-        latitude=latitude,
-        longitude=longitude,
-        radius_km=radius_km,
-    )
-
-    # --------------------------------------------------------
-    # Search a larger area for nearest echoes / precipitation.
-    #
-    # We don't want "nearest precipitation" limited to the
-    # user's analysis radius.
-    # --------------------------------------------------------
-
     search_radius_km = max(
         radius_km,
         100.0,
-    )
-
-    nearest_echo_km = nearest_threshold_distance(
-        da=reflectivity_da,
-        latitude=latitude,
-        longitude=longitude,
-        threshold=10.0,
-        search_radius_km=search_radius_km,
-        minimum_valid_value=-90.0,
     )
 
     nearest_precip_km = nearest_threshold_distance(
@@ -974,9 +902,29 @@ def get_mrms_precipitation(
         minimum_valid_value=0.0,
     )
 
-    # --------------------------------------------------------
-    # Determine simple factual conditions
-    # --------------------------------------------------------
+    del precip_da
+    gc.collect()
+
+    reflectivity_da, reflectivity_file = get_mrms_data(REFLECTIVITY_PRODUCT)
+
+    reflectivity = analyze_reflectivity(
+        da=reflectivity_da,
+        latitude=latitude,
+        longitude=longitude,
+        radius_km=radius_km,
+    )
+
+    nearest_echo_km = nearest_threshold_distance(
+        da=reflectivity_da,
+        latitude=latitude,
+        longitude=longitude,
+        threshold=10.0,
+        search_radius_km=search_radius_km,
+        minimum_valid_value=-90.0,
+    )
+
+    del reflectivity_da
+    gc.collect()
 
     point_rate = precip["point_rate_mm_hr"]
 

@@ -1,10 +1,12 @@
+# flake8: noqa: E402
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+import gc
 import math
 import os
 import re
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import matplotlib
 
@@ -12,16 +14,21 @@ import matplotlib
 # cannot create figures off the main thread.
 matplotlib.use("Agg", force=True)
 
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 import numpy as np
 import pyart
 import s3fs
-
 from langchain.tools import tool
-from pydantic import BaseModel, Field
+from matplotlib.colors import BoundaryNorm, ListedColormap
+from metpy.plots import USCOUNTIES
 
 # Py-ART's internal NEXRAD site table.
 from pyart.io.nexrad_common import NEXRAD_LOCATIONS
+from pydantic import BaseModel, Field
+
+from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
 
 # ============================================================
 # Configuration
@@ -36,6 +43,66 @@ RADAR_PLOT_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
+
+RADAR_S3_BUCKET = os.environ.get("RADAR_S3_BUCKET", "stormy-ai-files")
+RADAR_S3_PREFIX = os.environ.get("RADAR_S3_PREFIX", "radar").strip("/")
+
+# Reuse the latest in-process NEXRAD volume between analyze and plot tools.
+_RADAR_VOLUME_CACHE: dict[str, tuple] = {}
+
+
+def clear_radar_volume_cache() -> None:
+    """Drop any cached NEXRAD volume and encourage prompt memory release."""
+
+    _RADAR_VOLUME_CACHE.clear()
+    gc.collect()
+
+
+def radar_plot_s3_uri(when: datetime) -> str:
+    """
+    Build the canonical S3 URI for a radar plot.
+
+    Layout: s3://stormy-ai-files/radar/<YYYY-MM-DD>/<hh>_<mm>.png
+    """
+
+    when_utc = when.astimezone(timezone.utc)
+    key = (
+        f"{RADAR_S3_PREFIX}/"
+        f"{when_utc.strftime('%Y-%m-%d')}/"
+        f"{when_utc.strftime('%H')}_{when_utc.strftime('%M')}.png"
+    )
+    return f"s3://{RADAR_S3_BUCKET}/{key}"
+
+
+def upload_radar_plot_to_s3(
+    local_path: Path | str,
+    when: datetime | None = None,
+) -> str:
+    """
+    Upload a local radar PNG to the Stormy AI files bucket.
+
+    Returns the s3:// URI written to.
+    """
+
+    path = Path(local_path)
+
+    if not path.is_file():
+        raise FileNotFoundError(f"Radar plot not found: {path}")
+
+    timestamp = when or datetime.now(timezone.utc)
+    s3_uri = radar_plot_s3_uri(timestamp)
+    return upload_public_s3_object(path, s3_uri, content_type="image/png")
+
+
+def _timestamp_from_valid_time(valid_time: str | None) -> datetime:
+    """Parse a NEXRAD valid-time string, falling back to now (UTC)."""
+
+    if not valid_time:
+        return datetime.now(timezone.utc)
+
+    return datetime.fromisoformat(
+        valid_time.replace("Z", "+00:00"),
+    )
 
 
 # ============================================================
@@ -62,10 +129,7 @@ def haversine_km(
     dlat = lat2_rad - lat1_rad
     dlon = lon2_rad - lon1_rad
 
-    a = (
-        np.sin(dlat / 2.0) ** 2
-        + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2.0) ** 2
-    )
+    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2.0) ** 2
 
     c = 2.0 * np.arctan2(
         np.sqrt(a),
@@ -273,16 +337,23 @@ def load_latest_radar(
 
     s3_path = get_latest_nexrad_file(station)
 
+    cached = _RADAR_VOLUME_CACHE.get(s3_path)
+    if cached is not None:
+        return cached
+
     radar = pyart.io.read_nexrad_archive(
         s3_path,
         storage_options={"anon": True},
     )
 
-    return (
+    result = (
         radar,
         station_info,
         s3_path,
     )
+    _RADAR_VOLUME_CACHE.clear()
+    _RADAR_VOLUME_CACHE[s3_path] = result
+    return result
 
 
 # ============================================================
@@ -520,9 +591,7 @@ def strong_echo_diagnostics(
         reflectivity_field,
     )
 
-    strong_mask = (
-        gate_mask & (~np.ma.getmaskarray(reflectivity)) & (reflectivity >= 50.0)
-    )
+    strong_mask = gate_mask & (~np.ma.getmaskarray(reflectivity)) & (reflectivity >= 50.0)
 
     strong_count = int(np.count_nonzero(strong_mask))
 
@@ -600,9 +669,7 @@ class NexradAnalysisInput(BaseModel):
         default=30.0,
         gt=0,
         le=150,
-        description=(
-            "Radius around the location in kilometers " "for Level II radar analysis."
-        ),
+        description=("Radius around the location in kilometers " "for Level II radar analysis."),
     )
 
     radar_station: str | None = Field(
@@ -879,12 +946,10 @@ class NexradPlotInput(BaseModel):
     )
 
     radius_km: float = Field(
-        default=75.0,
+        default=100.0,
         gt=5,
         le=250,
-        description=(
-            "Approximate radius around the location " "to show on the radar map."
-        ),
+        description=("Approximate radius around the location " "to show on the radar map."),
     )
 
     field: str = Field(
@@ -904,9 +969,7 @@ class NexradPlotInput(BaseModel):
 
     radar_station: str | None = Field(
         default=None,
-        description=(
-            "Optional NEXRAD ID such as KABX. " "Leave empty to use the nearest radar."
-        ),
+        description=("Optional NEXRAD ID such as KABX. " "Leave empty to use the nearest radar."),
     )
 
 
@@ -923,6 +986,230 @@ PLOT_FIELD_MAP = {
     "specific_differential_phase": "kdp",
 }
 
+# Field-specific display settings for readable briefing images.
+PLOT_FIELD_STYLE = {
+    "reflectivity": {
+        "cmap": ListedColormap(
+            [
+                "#00e64d",
+                "#00b83f",
+                "#008c34",
+                "#fff200",
+                "#f6c800",
+                "#ff9500",
+                "#ff3b1f",
+                "#d7191c",
+                "#a50000",
+                "#ff00ff",
+                "#b246c2",
+                "#7b2cbf",
+                "#3155d9",
+                "#111111",
+            ],
+            name="stormy_reflectivity",
+        ),
+        "levels": list(range(5, 80, 5)),
+        "ticks": list(range(5, 80, 10)),
+        "vmin": 5,
+        "vmax": 75,
+        "colorbar_label": "Reflectivity (dBZ)",
+        "mask_below": 5.0,
+        "title_name": "Base Reflectivity",
+    },
+    "velocity": {
+        "cmap": "NWSVel",
+        "vmin": -40,
+        "vmax": 40,
+        "colorbar_label": "Radial Velocity (m/s)",
+        "mask_below": None,
+        "title_name": "Velocity",
+    },
+    "zdr": {
+        "cmap": "RefDiff",
+        "vmin": -2,
+        "vmax": 6,
+        "colorbar_label": "ZDR (dB)",
+        "mask_below": None,
+        "title_name": "Differential Reflectivity",
+    },
+    "rhohv": {
+        "cmap": "HomeyerRainbow",
+        "vmin": 0.8,
+        "vmax": 1.05,
+        "colorbar_label": "ρHV",
+        "mask_below": None,
+        "title_name": "Correlation Coefficient",
+    },
+    "phidp": {
+        "cmap": "HomeyerRainbow",
+        "vmin": 0,
+        "vmax": 180,
+        "colorbar_label": "ΦDP (°)",
+        "mask_below": None,
+        "title_name": "Differential Phase",
+    },
+    "kdp": {
+        "cmap": "HomeyerRainbow",
+        "vmin": -2,
+        "vmax": 6,
+        "colorbar_label": "KDP (°/km)",
+        "mask_below": None,
+        "title_name": "Specific Differential Phase",
+    },
+}
+
+# A neutral operational basemap keeps geography visible without competing with
+# the conventional radar colors.
+_PLOT_BG = "#ffffff"
+_PLOT_OCEAN = "#dcecf4"
+_PLOT_LAND = "#f2f1ec"
+_PLOT_LAKE = "#dcecf4"
+_PLOT_BOUNDARY = "#59636e"
+_PLOT_COUNTY = "#9aa1a8"
+_PLOT_GRID = "#84909c"
+_PLOT_TEXT = "#17212b"
+_PLOT_MUTED = "#56616c"
+_PLOT_ACCENT = "#087ea4"
+
+
+def _gridline_spacing_deg(span_deg: float) -> float:
+    """Pick a readable lat/lon grid spacing for the map span."""
+
+    if span_deg <= 1.0:
+        return 0.25
+    if span_deg <= 2.5:
+        return 0.5
+    if span_deg <= 5.0:
+        return 1.0
+    return 2.0
+
+
+def _gridline_values(min_value: float, max_value: float, step: float) -> np.ndarray:
+    """Return evenly spaced gridline coordinates covering the bounds."""
+
+    start = math.floor(min_value / step) * step
+    stop = math.ceil(max_value / step) * step
+    return np.arange(start, stop + (step * 0.5), step)
+
+
+def _range_ring_distances_km(radius_km: float) -> list[float]:
+    """Choose radar range rings that fit the visible domain."""
+
+    if radius_km <= 40:
+        step = 10.0
+    elif radius_km <= 100:
+        step = 25.0
+    else:
+        step = 50.0
+
+    rings = []
+    distance = step
+    while distance <= radius_km:
+        rings.append(distance)
+        distance += step
+    return rings
+
+
+def _style_radar_axes(display, fig) -> None:
+    """Apply briefing-image styling to a finished RadarMapDisplay plot."""
+
+    ax = display.ax
+    fig.patch.set_facecolor(_PLOT_BG)
+    ax.set_facecolor(_PLOT_OCEAN)
+
+    if ax.title is not None:
+        ax.title.set_color(_PLOT_TEXT)
+        ax.title.set_fontsize(13)
+        ax.title.set_fontweight("bold")
+
+    for spine in ax.spines.values():
+        spine.set_color(_PLOT_BOUNDARY)
+
+    if getattr(display, "cbs", None):
+        colorbar = display.cbs[-1]
+        colorbar.ax.tick_params(colors=_PLOT_MUTED, labelsize=8)
+        plt.setp(colorbar.ax.xaxis.get_ticklabels(), color=_PLOT_MUTED)
+        plt.setp(colorbar.ax.yaxis.get_ticklabels(), color=_PLOT_MUTED)
+        colorbar.ax.xaxis.label.set_color(_PLOT_MUTED)
+        colorbar.ax.yaxis.label.set_color(_PLOT_MUTED)
+        colorbar.outline.set_edgecolor(_PLOT_BOUNDARY)
+        colorbar.ax.set_facecolor(_PLOT_BG)
+
+
+def _add_map_features(ax, resolution: str = "110m") -> None:
+    """Draw land, water, and political boundaries under the radar sweep."""
+
+    ax.add_feature(
+        cfeature.OCEAN.with_scale(resolution),
+        facecolor=_PLOT_OCEAN,
+        zorder=0,
+    )
+    ax.add_feature(
+        cfeature.LAND.with_scale(resolution),
+        facecolor=_PLOT_LAND,
+        zorder=0,
+    )
+    ax.add_feature(
+        cfeature.LAKES.with_scale(resolution),
+        facecolor=_PLOT_LAKE,
+        edgecolor=_PLOT_BOUNDARY,
+        linewidth=0.4,
+        zorder=0,
+    )
+    ax.add_feature(
+        cfeature.COASTLINE.with_scale(resolution),
+        edgecolor=_PLOT_BOUNDARY,
+        linewidth=0.9,
+        zorder=1,
+    )
+    ax.add_feature(
+        cfeature.STATES.with_scale(resolution),
+        edgecolor=_PLOT_BOUNDARY,
+        linewidth=0.7,
+        zorder=1,
+    )
+    ax.add_feature(
+        cfeature.BORDERS.with_scale(resolution),
+        edgecolor=_PLOT_BOUNDARY,
+        linewidth=0.9,
+        zorder=1,
+    )
+    ax.add_feature(
+        USCOUNTIES.with_scale("20m"),
+        facecolor="none",
+        edgecolor=_PLOT_COUNTY,
+        linewidth=0.35,
+        alpha=0.8,
+        zorder=1,
+    )
+
+
+def _visible_field_max(
+    radar,
+    sweep: int,
+    radar_field: str,
+    bounds: tuple[float, float, float, float],
+    minimum: float | None = None,
+) -> float | None:
+    """Return the maximum unmasked gate value inside the displayed map."""
+
+    min_lon, max_lon, min_lat, max_lat = bounds
+    gate_lat, gate_lon, _ = radar.get_gate_lat_lon_alt(sweep)
+    values = np.ma.asarray(radar.get_field(sweep, radar_field))
+    valid = (
+        (~np.ma.getmaskarray(values))
+        & np.isfinite(np.ma.filled(values, np.nan))
+        & (gate_lat >= min_lat)
+        & (gate_lat <= max_lat)
+        & (gate_lon >= min_lon)
+        & (gate_lon <= max_lon)
+    )
+    if minimum is not None:
+        valid &= np.ma.filled(values, -np.inf) >= minimum
+    if not np.any(valid):
+        return None
+    return float(np.max(np.ma.filled(values, -np.inf)[valid]))
+
 
 # ============================================================
 # LANGCHAIN TOOL #2
@@ -936,7 +1223,7 @@ PLOT_FIELD_MAP = {
 def plot_nexrad_level2(
     latitude: float,
     longitude: float,
-    radius_km: float = 75.0,
+    radius_km: float = 100.0,
     field: str = "reflectivity",
     sweep: int = 0,
     radar_station: str | None = None,
@@ -959,8 +1246,7 @@ def plot_nexrad_level2(
 
     if sweep >= radar.nsweeps:
         raise ValueError(
-            f"Requested sweep {sweep}, but radar only "
-            f"contains {radar.nsweeps} sweeps."
+            f"Requested sweep {sweep}, but radar only " f"contains {radar.nsweeps} sweeps."
         )
 
     # --------------------------------------------------------
@@ -977,6 +1263,8 @@ def plot_nexrad_level2(
             f"Supported fields: "
             f"{list(PLOT_FIELD_MAP.keys())}"
         )
+
+    style = PLOT_FIELD_STYLE[field_type]
 
     if field_type == "kdp":
 
@@ -1000,9 +1288,13 @@ def plot_nexrad_level2(
     # Convert km radius to geographic bounds
     # --------------------------------------------------------
 
-    lat_delta = radius_km / 111.0
+    # Slightly widen the map so the default view is a little more zoomed out
+    # than the requested analysis radius.
+    display_radius_km = radius_km * 1.3
 
-    lon_delta = radius_km / (111.0 * math.cos(math.radians(latitude)))
+    lat_delta = display_radius_km / 111.0
+
+    lon_delta = display_radius_km / (111.0 * math.cos(math.radians(latitude)))
 
     min_lat = latitude - lat_delta
 
@@ -1012,82 +1304,272 @@ def plot_nexrad_level2(
 
     max_lon = longitude + lon_delta
 
+    lat_step = _gridline_spacing_deg(max_lat - min_lat)
+    lon_step = _gridline_spacing_deg(max_lon - min_lon)
+    lat_lines = _gridline_values(min_lat, max_lat, lat_step)
+    lon_lines = _gridline_values(min_lon, max_lon, lon_step)
+
+    gatefilter = None
+    if style["mask_below"] is not None:
+        gatefilter = pyart.filters.GateFilter(radar)
+        gatefilter.exclude_below(radar_field, style["mask_below"])
+
+    levels = style.get("levels")
+    norm = BoundaryNorm(levels, style["cmap"].N, clip=True) if levels is not None else None
+    plot_vmin = None if norm is not None else style["vmin"]
+    plot_vmax = None if norm is not None else style["vmax"]
+
+    valid_time = parse_nexrad_time(s3_path)
+    elevation_deg = round(float(radar.fixed_angle["data"][sweep]), 2)
+    time_label = valid_time.replace("T", " ").replace("Z", " UTC") if valid_time else "latest scan"
+    visible_max = _visible_field_max(
+        radar,
+        sweep,
+        radar_field,
+        (min_lon, max_lon, min_lat, max_lat),
+        minimum=style["mask_below"],
+    )
+
     # --------------------------------------------------------
     # Plot
     # --------------------------------------------------------
 
     display = pyart.graph.RadarMapDisplay(radar)
+    local_crs = ccrs.AzimuthalEquidistant(
+        central_longitude=longitude,
+        central_latitude=latitude,
+    )
 
-    fig = plt.figure(figsize=(10, 8))
+    # Radar maps are naturally local and nearly square. An explicit axes and
+    # colorbar layout avoids the large margins produced by GeoAxes + an
+    # automatically appended horizontal colorbar.
+    fig = plt.figure(figsize=(7.6, 8.0), facecolor=_PLOT_BG)
+    ax = fig.add_axes([0.055, 0.19, 0.89, 0.68], projection=local_crs)
 
     display.plot_ppi_map(
         radar_field,
         sweep=sweep,
+        vmin=plot_vmin,
+        vmax=plot_vmax,
+        cmap=style["cmap"],
+        norm=norm,
         min_lat=min_lat,
         max_lat=max_lat,
         min_lon=min_lon,
         max_lon=max_lon,
-        title=(
-            f"{station_info['station']} "
-            f"{field.replace('_', ' ').title()} "
-            f"{parse_nexrad_time(s3_path)}"
-        ),
-        colorbar_label=(
-            radar.fields[radar_field].get(
-                "units",
-                "",
-            )
-        ),
+        lat_lines=lat_lines,
+        lon_lines=lon_lines,
+        projection=local_crs,
+        resolution="110m",
+        title_flag=False,
+        colorbar_flag=False,
+        gatefilter=gatefilter,
+        mask_outside=True,
+        embellish=False,
+        add_grid_lines=False,
         raster=True,
+        alpha=0.9,
+        ticks=style.get("ticks"),
+        fig=fig,
+        ax=ax,
     )
 
-    display.plot_point(
-        longitude,
-        latitude,
-        symbol="k*",
-        markersize=12,
-        label_text="Location",
+    colorbar_axis = fig.add_axes([0.09, 0.105, 0.82, 0.035])
+    colorbar = fig.colorbar(
+        display.plots[-1],
+        cax=colorbar_axis,
+        orientation="horizontal",
+        ticks=style.get("ticks"),
+    )
+    colorbar.set_label(style["colorbar_label"], fontsize=9, color=_PLOT_MUTED)
+    display.cbs.append(colorbar)
+
+    _add_map_features(ax, resolution="110m")
+    ax.set_extent(
+        [min_lon, max_lon, min_lat, max_lat],
+        crs=ccrs.PlateCarree(),
+    )
+
+    ring_distances = _range_ring_distances_km(display_radius_km)
+    for ring_km in ring_distances:
+        display.plot_range_ring(
+            ring_km,
+            color=_PLOT_GRID,
+            line_style="--",
+            linewidth=0.7,
+            alpha=0.65,
+            zorder=2,
+        )
+
+    # Star marks the briefing location (no text label — keeps the map clean).
+    ax.scatter(
+        [longitude],
+        [latitude],
+        marker="*",
+        s=280,
+        facecolor=_PLOT_ACCENT,
+        edgecolor="white",
+        linewidth=1.6,
+        transform=ccrs.PlateCarree(),
+        zorder=6,
+    )
+
+    radar_lon = station_info["longitude"]
+    radar_lat = station_info["latitude"]
+    if min_lon <= radar_lon <= max_lon and min_lat <= radar_lat <= max_lat:
+        ax.scatter(
+            [radar_lon],
+            [radar_lat],
+            marker="^",
+            s=80,
+            facecolor="#343a40",
+            edgecolor="white",
+            linewidth=1.2,
+            transform=ccrs.PlateCarree(),
+            zorder=6,
+        )
+        ax.annotate(
+            station_info["station"],
+            xy=(radar_lon, radar_lat),
+            xytext=(7, 6),
+            textcoords="offset points",
+            color=_PLOT_TEXT,
+            fontsize=8,
+            fontweight="bold",
+            transform=ccrs.PlateCarree(),
+            zorder=6,
+        )
+
+    gl = ax.gridlines(
+        draw_labels=True,
+        linewidth=0.5,
+        color=_PLOT_GRID,
+        alpha=0.75,
+        linestyle=":",
+        xlocs=lon_lines,
+        ylocs=lat_lines,
+    )
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {"color": _PLOT_MUTED, "size": 8}
+    gl.ylabel_style = {"color": _PLOT_MUTED, "size": 8}
+
+    _style_radar_axes(display, fig)
+
+    fig.text(
+        0.055,
+        0.955,
+        f"NEXRAD {style['title_name']}",
+        color=_PLOT_TEXT,
+        fontsize=17,
+        fontweight="bold",
+        ha="left",
+        va="top",
+    )
+    fig.text(
+        0.055,
+        0.915,
+        (f"{station_info['station']}  •  {elevation_deg:g}° lowest tilt  •  " f"Scan {time_label}"),
+        color=_PLOT_MUTED,
+        fontsize=10,
+        ha="left",
+        va="top",
+    )
+    if field_type == "reflectivity":
+        echo_summary = (
+            f"Peak sampled gate: {visible_max:.0f} dBZ"
+            if visible_max is not None
+            else "No echoes ≥ 5 dBZ"
+        )
+        ax.text(
+            0.985,
+            0.98,
+            echo_summary,
+            transform=ax.transAxes,
+            color=_PLOT_TEXT,
+            fontsize=8.5,
+            fontweight="bold",
+            ha="right",
+            va="top",
+            bbox={
+                "facecolor": "white",
+                "edgecolor": _PLOT_BOUNDARY,
+                "linewidth": 0.5,
+                "alpha": 0.88,
+                "pad": 3,
+            },
+            zorder=8,
+        )
+    ring_text = f"Range rings: {ring_distances[0]:g} km intervals" if ring_distances else ""
+    fig.text(
+        0.055,
+        0.035,
+        (
+            f"{ring_text}  •  Values below {style['mask_below']:g} dBZ omitted  •  Base reflectivity may include non-weather clutter"
+            if field_type == "reflectivity"
+            else f"{ring_text}  •  NEXRAD Level II"
+        ),
+        color=_PLOT_MUTED,
+        fontsize=8,
+        ha="left",
+        va="bottom",
     )
 
     # --------------------------------------------------------
     # Filename
     # --------------------------------------------------------
 
-    valid_time = parse_nexrad_time(s3_path)
-
     safe_time = valid_time.replace(":", "").replace("-", "") if valid_time else "latest"
 
     filename = (
-        f"{station_info['station']}_"
-        f"{normalized_field}_"
-        f"sweep{sweep}_"
-        f"{safe_time}.png"
+        f"{station_info['station']}_" f"{normalized_field}_" f"sweep{sweep}_" f"{safe_time}.png"
     )
 
     output_path = RADAR_PLOT_DIR / filename
 
-    plt.savefig(
+    # Avoid bbox_inches="tight": cartopy map artists are often excluded
+    # from the tight bbox, which can save only the colorbar.
+    fig.savefig(
         output_path,
-        dpi=150,
-        bbox_inches="tight",
+        dpi=120,
+        facecolor=fig.get_facecolor(),
+        edgecolor="none",
     )
 
     plt.close(fig)
+    del radar, display
+    clear_radar_volume_cache()
+
+    plot_time = _timestamp_from_valid_time(valid_time)
+
+    try:
+        image_s3_uri = upload_radar_plot_to_s3(
+            output_path,
+            when=plot_time,
+        )
+        s3_upload_error = None
+    except Exception as exc:
+        image_s3_uri = None
+        s3_upload_error = str(exc)
+
+    image_https_url = s3_uri_to_https_url(image_s3_uri) if image_s3_uri else None
 
     return {
         "status": "success",
         "image_path": str(output_path.resolve()),
+        "s3_uri": image_s3_uri,
+        "https_url": image_https_url,
+        "markdown_image_url": image_https_url,
+        "s3_upload_error": s3_upload_error,
         "mime_type": "image/png",
         "field": radar_field,
         "requested_field": normalized_field,
         "sweep": sweep,
-        "elevation_angle_deg": round(
-            float(radar.fixed_angle["data"][sweep]),
-            2,
-        ),
+        "elevation_angle_deg": elevation_deg,
         "radar_station": station_info["station"],
         "radar_distance_from_user_km": station_info["distance_km"],
         "valid_time": valid_time,
+        "maximum_displayed_value": visible_max,
         "s3_path": s3_path,
         "plot_center": {
             "latitude": latitude,

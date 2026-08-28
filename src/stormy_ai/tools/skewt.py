@@ -1,33 +1,26 @@
 from __future__ import annotations
 
+import math
 from datetime import (
     datetime,
     timedelta,
     timezone,
 )
 
-import math
-
+import metpy.calc as mpcalc
 import numpy as np
 import pandas as pd
-
-import metpy.calc as mpcalc
-
+from langchain.tools import tool
 from metpy.io import (
     add_station_lat_lon,
 )
-
 from metpy.units import units
-
-from siphon.simplewebservice.iastate import (
-    IAStateUpperAir,
-)
-
-from langchain.tools import tool
-
 from pydantic import (
     BaseModel,
     Field,
+)
+from siphon.simplewebservice.iastate import (
+    IAStateUpperAir,
 )
 
 # ============================================================
@@ -141,10 +134,7 @@ def haversine_km(
 
     delta_lon = lon2 - lon1
 
-    a = (
-        np.sin(delta_lat / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon / 2) ** 2
-    )
+    a = np.sin(delta_lat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon / 2) ** 2
 
     a = np.clip(
         a,
@@ -390,9 +380,7 @@ def load_latest_sounding(
 
             last_error = exc
 
-    raise RuntimeError(
-        f"No recent sounding available for " f"{station}. Last error: {last_error}"
-    )
+    raise RuntimeError(f"No recent sounding available for " f"{station}. Last error: {last_error}")
 
 
 # ============================================================
@@ -522,9 +510,9 @@ def interpolate_at_pressure(
 
         return None
 
-    if target_pressure_hpa > np.nanmax(
+    if target_pressure_hpa > np.nanmax(pressure_values) or target_pressure_hpa < np.nanmin(
         pressure_values
-    ) or target_pressure_hpa < np.nanmin(pressure_values):
+    ):
         return None
 
     # np.interp needs increasing X.
@@ -1502,9 +1490,7 @@ def build_environment_signals(
         "meaningful_instability": (mlcape is not None and mlcape >= 500),
         "strong_instability": (mlcape is not None and mlcape >= 1500),
         "strong_deep_layer_shear": (shear_6km is not None and shear_6km >= 35),
-        "steep_midlevel_lapse_rates": (
-            lapse_700_500 is not None and lapse_700_500 >= 7.0
-        ),
+        "steep_midlevel_lapse_rates": (lapse_700_500 is not None and lapse_700_500 >= 7.0),
         "low_lcl": (lcl_height is not None and lcl_height <= 1000),
         "large_dcape": (dcape is not None and dcape >= 1000),
     }
@@ -1534,8 +1520,7 @@ class CurrentSkewTInput(BaseModel):
         ge=0,
         le=18,
         description=(
-            "HRRR forecast lead time in hours. "
-            "Use 0 for the latest available HRRR analysis."
+            "HRRR forecast lead time in hours. " "Use 0 for the latest available HRRR analysis."
         ),
     )
 
@@ -1617,8 +1602,7 @@ def analyze_sounding_dataframe(
 
     if len(therm_profile) < 8:
         raise ValueError(
-            "Sounding does not contain enough valid "
-            "thermodynamic levels for analysis."
+            "Sounding does not contain enough valid " "thermodynamic levels for analysis."
         )
 
     pressure = therm_profile["pressure"].to_numpy() * units.hPa

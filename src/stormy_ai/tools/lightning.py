@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Literal
 import math
 import os
 import re
 import tempfile
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 import numpy as np
 import s3fs
 import xarray as xr
-
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 
@@ -120,9 +119,7 @@ def glm_hour_prefix(
     DDD = Julian day.
     """
 
-    return (
-        f"{bucket}/" f"{GLM_PRODUCT}/" f"{dt:%Y}/" f"{dt.strftime('%j')}/" f"{dt:%H}/"
-    )
+    return f"{bucket}/" f"{GLM_PRODUCT}/" f"{dt:%Y}/" f"{dt.strftime('%j')}/" f"{dt:%H}/"
 
 
 # ============================================================
@@ -247,9 +244,7 @@ def find_latest_glm_file(
 
     if not candidates:
 
-        raise FileNotFoundError(
-            f"No recent {GLM_PRODUCT} " f"files found in " f"s3://{bucket}/"
-        )
+        raise FileNotFoundError(f"No recent {GLM_PRODUCT} " f"files found in " f"s3://{bucket}/")
 
     file_time, key = max(
         candidates,
@@ -341,10 +336,7 @@ def haversine_km(
 
     delta_lon = lon2 - lon1
 
-    a = (
-        np.sin(delta_lat / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon / 2) ** 2
-    )
+    a = np.sin(delta_lat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(delta_lon / 2) ** 2
 
     a = np.clip(
         a,
@@ -385,9 +377,7 @@ def bearing_degrees(
 
     y = math.sin(delta_lon) * math.cos(lat2)
 
-    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
-        delta_lon
-    )
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon)
 
     bearing = math.degrees(
         math.atan2(
@@ -561,18 +551,14 @@ class LightningInput(BaseModel):
         default=50.0,
         gt=0,
         le=500,
-        description=(
-            "Radius around the location in kilometers " "for lightning analysis."
-        ),
+        description=("Radius around the location in kilometers " "for lightning analysis."),
     )
 
     window_minutes: int = Field(
         default=10,
         ge=2,
         le=60,
-        description=(
-            "Number of recent minutes of GLM " "lightning observations to analyze."
-        ),
+        description=("Number of recent minutes of GLM " "lightning observations to analyze."),
     )
 
     satellite: Literal[
@@ -672,9 +658,7 @@ def get_lightning(
 
     if not files:
 
-        raise FileNotFoundError(
-            "No GLM files were found " "inside the requested window."
-        )
+        raise FileNotFoundError("No GLM files were found " "inside the requested window.")
 
     flashes = []
 
@@ -808,9 +792,7 @@ def get_lightning(
 
     recent_count = sum(flash["time"] >= recent_start for flash in flashes)
 
-    previous_count = sum(
-        previous_start <= flash["time"] < recent_start for flash in flashes
-    )
+    previous_count = sum(previous_start <= flash["time"] < recent_start for flash in flashes)
 
     trend = determine_lightning_trend(
         previous_count,
@@ -912,11 +894,7 @@ def get_lightning(
                 "including in-cloud and "
                 "cloud-to-ground lightning."
             ),
-            (
-                "Nearest distance is to the "
-                "GLM flash centroid, not a "
-                "confirmed ground strike."
-            ),
+            ("Nearest distance is to the " "GLM flash centroid, not a " "confirmed ground strike."),
             (
                 "Flash count and trend indicate "
                 "electrical convective activity "

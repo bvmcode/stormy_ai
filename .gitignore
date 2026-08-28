@@ -9,5 +9,15 @@ wheels/
 # Virtual environments
 .venv
 
+# Local secrets
+.env
+
 # Generated briefings
 briefings/
+model_plots/
+
+# Terraform
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/*.tfvars

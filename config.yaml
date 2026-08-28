@@ -1,0 +1,32 @@
+# Stormy AI configuration. Override any value with environment variables;
+# see .env.example for secrets and common overrides.
+
+llm:
+  # ollama — local Ollama server
+  # huggingface — Hugging Face Inference Providers (set HF_TOKEN in .env)
+  # provider: ollama
+  # model: gemma4:latest
+  provider: huggingface
+  model: zai-org/GLM-5.3-Flash:baseten
+  temperature: 0
+  ollama:
+    base_url: http://127.0.0.1:11434
+  huggingface:
+    base_url: https://router.huggingface.co/v1
+    inference_provider: baseten
+
+briefing:
+  default_location: "Atco, NJ 08004"
+  dir: briefings
+  image_width: 720
+
+paths:
+  radar_plot_dir: radar_plots
+  gfs_model_plot_dir: model_plots
+
+storage:
+  s3_bucket: stormy-ai-files
+  briefing_prefix: briefings
+  radar_prefix: radar
+  gfs_prefix: models/gfs
+  public_base_url: ""

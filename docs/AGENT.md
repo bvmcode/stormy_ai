@@ -1,10 +1,10 @@
 # How the Stormy AI Agent Works
 
-Stormy AI is a **LangGraph** agent that gathers live weather data through tools, fuses key observations into a deterministic diagnosis, and uses a local **Ollama** LLM to write a structured markdown briefing.
+Stormy AI is a **LangGraph** agent that gathers live weather data through tools, fuses key observations into a deterministic diagnosis, and uses a configurable LLM (**Ollama** or **Hugging Face Inference Providers**) to write a structured markdown briefing.
 
 This document explains the orchestration: why LangGraph is used, how the graph is wired, what state is carried between steps, and how the LLM, tools, and diagnostics fit together.
 
-For per-source detail, see [`docs/tools/`](tools/). For setup and running the app, see the [README](../README.md).
+For per-source detail, see [`docs/tools/`](tools/). For setup and running the agent, see the [README](../README.md). For Docker and ECS deployment, see [`docs/DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 ---
 
@@ -19,7 +19,7 @@ A weather briefing is not a single LLM call. The model must:
 
 LangGraph models that as an explicit **state machine**: nodes do work, edges decide what happens next, and shared state carries messages plus structured weather fields.
 
-Compared to ad-hoc loops around `ChatOllama`, LangGraph gives:
+Compared to ad-hoc loops around a raw chat model, LangGraph gives:
 
 | Benefit | In Stormy AI |
 |---------|----------------|
@@ -35,11 +35,11 @@ The graph is defined in `src/stormy_ai/agent.py` and exported as `stormy_ai.grap
 ## High-level architecture
 
 ```text
-CLI (main.py)  or  Flask (app/web.py)
+CLI (main.py)  or  ECS Fargate container
         │
         ▼
  briefing.run_briefing(location)
-        │  builds user message, invokes graph, writes markdown
+        │  builds user message, invokes graph, post-processes markdown
         ▼
 ┌──────────────────────────────────────────────────────────┐
 │  LangGraph StateGraph (WeatherState)                     │
@@ -49,12 +49,13 @@ CLI (main.py)  or  Flask (app/web.py)
 │                            │              └─► agent      │
 │                            └─ (no tool calls) → END      │
 │                                                          │
-│  LLM: ChatOllama + bound tools                           │
+│  LLM: create_chat_model() + bound tools                  │
 │  Prompt: SYSTEM_PROMPT ± <weather_diagnosis>             │
 └──────────────────────────────────────────────────────────┘
         │
-        ├─► 11 LangChain tools (src/stormy_ai/tools/)
-        └─► diagnose_precipitation() (diagnostics.py)
+        ├─► 12 LangChain tools (src/stormy_ai/tools/)
+        ├─► diagnose_precipitation() (diagnostics.py)
+        └─► write_briefing_markdown() → local file + S3 upload
 ```
 
 There is **no separate planner or synthesizer node**. The same `agent` node both decides which tools to call and writes the final briefing once it has enough data.
@@ -96,7 +97,7 @@ START
 reset_weather          Clear mrms / nexrad / hrrr / lightning / diagnosis
   │
   ▼
-agent                  ChatOllama with tools bound; build system prompt
+agent                  create_chat_model() with tools bound; build system prompt
   │
   ├─ tools_condition sees tool_calls? ──yes──► tools (ToolNode)
   │                                              │
@@ -127,7 +128,7 @@ The graph is compiled with:
 graph = builder.compile()
 ```
 
-There is **no persistent conversation memory** across CLI/web requests. Each briefing is a fresh invoke. Helpers like `get_current_turn_messages` still scope weather collection to messages since the latest `HumanMessage`, so a future checkpointer would not accidentally reuse yesterday’s MRMS payload.
+There is **no persistent conversation memory** across runs. Each briefing is a fresh invoke. Helpers like `get_current_turn_messages` still scope weather collection to messages since the latest `HumanMessage`, so a future checkpointer would not accidentally reuse yesterday’s MRMS payload.
 
 ---
 
@@ -137,17 +138,21 @@ There is **no persistent conversation memory** across CLI/web requests. Each bri
 
 1. Builds a system prompt via `build_system_prompt(state)`
 2. Prepends that as a `SystemMessage` to `state["messages"]`
-3. Invokes `model_with_tools` (`ChatOllama.bind_tools(tools)`)
+3. Invokes `model_with_tools` (chat model with tools bound)
 4. Returns `{"messages": [response]}` so LangGraph appends the AI turn
 
 ### LLM configuration
 
-| Variable | Default | Role |
-|----------|---------|------|
-| `OLLAMA_MODEL` | `gemma4:latest` | Model tag in Ollama |
-| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama HTTP endpoint |
+LLM settings come from [`config.yaml`](../../config.yaml) (see [`stormy_ai.config`](../src/stormy_ai/config.py) and [`stormy_ai.llm`](../src/stormy_ai/llm.py)).
 
-Temperature is fixed at `0` for more repeatable briefings.
+| Provider | Config | Notes |
+|----------|--------|-------|
+| `ollama` (default) | `llm.provider: ollama` | Local Ollama; `llm.model` is the Ollama tag |
+| `huggingface` | `llm.provider: huggingface` | HF Inference Providers; `llm.model` is the model ID and `llm.huggingface.inference_provider` is appended as a router suffix |
+
+Set `HF_TOKEN` in `.env` for the Hugging Face provider. Env vars such as `STORMY_LLM_PROVIDER`, `STORMY_LLM_MODEL`, `STORMY_HF_INFERENCE_PROVIDER`, `OLLAMA_MODEL`, and `OLLAMA_BASE_URL` override the config file.
+
+Temperature defaults to `0` in config for more repeatable briefings.
 
 ### System prompt layers
 
@@ -180,6 +185,7 @@ Registered tools (order in `tools/__init__.py`):
 | `plot_nexrad_level2` | `radar.py` | Radar PNG for the briefing |
 | `get_lightning` | `lightning.py` | GOES GLM recent flashes |
 | `analyze_current_skewt` | `skewt.py` | Full MetPy analysis of HRRR sounding |
+| `get_gfs_guidance` | `models.py` | Latest-cycle GFS point guidance and regional charts through 72 hours |
 
 ### `collect_weather_results`
 
@@ -197,22 +203,25 @@ On the next `agent` hop, `build_system_prompt` can inject that diagnosis.
 
 ## How a briefing run is driven
 
-`briefing.run_briefing(location)` is the shared entry used by CLI and web:
+`briefing.run_briefing(location)` is the shared entry used by the CLI and ECS task:
 
 1. Build a user message via `build_briefing_request` that demands geocoding then **every** tool once, then a full weather briefing
 2. `graph.invoke({"messages": [("user", ...)]})`
 3. Take the final AI message as briefing text
-4. Find the latest `plot_nexrad_level2` `image_path` if any
-5. Write `briefings/YYYY-MM-DD_HHMM_<slug>.md`
+4. Post-process images:
+   - `ensure_radar_image_markdown` — embed radar via `markdown_image_url` (public HTTPS)
+   - `ensure_gfs_guidance_markdown` — insert day 1–3 GFS charts if the model omitted them
+   - `normalize_briefing_images` — convert markdown links and bare URLs to sized `<img>` tags
+5. `write_briefing_markdown` — write `briefings/YYYY-MM-DD_HHMM_<slug>.md` and upload to S3
 
-There is a single briefing type: **weather** (`DEFAULT_BRIEFING_TYPE = "weather"`). Older “current vs daily” modes are gone; the prompt and runner always produce the same sectioned report (headline, alerts, current weather, synoptic setup, HRRR analysis, outlook, 3-day forecast, bottom line).
+There is a single briefing type: **weather** (`DEFAULT_BRIEFING_TYPE = "weather"`). Older “current vs daily” modes are gone; the prompt and runner always produce the same sectioned report (headline, alerts, current weather, synoptic setup, GFS guidance, HRRR analysis, outlook, 3-day forecast, bottom line).
 
 The system prompt’s recommended tool order:
 
 ```text
 geocode → alerts → current_conditions → MRMS → HRRR →
 NEXRAD analyze → NEXRAD plot → lightning → skew-T →
-forecast → forecast_discussion → write briefing
+GFS guidance → forecast → forecast_discussion → write briefing
 ```
 
 The model may batch or reorder somewhat; the user message and prompt both insist every tool is used before the final write.
@@ -246,7 +255,7 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 7. Once MRMS + HRRR exist, collect_weather sets diagnosis
 8. agent sees <weather_diagnosis> and writes markdown sections
 9. agent returns text with no tool_calls → graph END
-10. briefing markdown (+ optional radar path) is persisted / rendered
+10. briefing markdown is post-processed (radar/GFS embeds) and written locally + uploaded to S3
 ```
 
 ---
@@ -257,7 +266,7 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 2. **Deterministic fusion where ambiguity is costly** — precip type and intensity are coded, then explained in prose.
 3. **Per-invoke isolation** — reset weather state every run; no silent reuse of old radar or diagnosis.
 4. **Source roles stay explicit** — NWS for official obs/forecast/alerts; MRMS for current precip; HRRR/skew-T as model guidance; GLM centroids ≠ ground strikes.
-5. **One briefing format** — always the same markdown skeleton so CLI, web, and saved files stay comparable.
+5. **One briefing format** — always the same markdown skeleton so CLI output and saved files stay comparable.
 
 ---
 
@@ -266,8 +275,12 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 | Path | Role |
 |------|------|
 | `src/stormy_ai/agent.py` | Graph, state, collect/diagnose injection |
-| `src/stormy_ai/briefing.py` | `run_briefing`, markdown output, radar path extract |
+| `src/stormy_ai/briefing.py` | `run_briefing`, markdown post-processing, S3 upload |
+| `src/stormy_ai/config.py` | `config.yaml` loader and env overrides |
+| `src/stormy_ai/llm.py` | Ollama / Hugging Face chat model factory |
+| `src/stormy_ai/utils.py` | S3 upload, `s3://` → HTTPS, tool-content parsing |
 | `src/stormy_ai/diagnostics.py` | Deterministic precip / storm fusion |
 | `src/stormy_ai/prompts/__init__.py` | `SYSTEM_PROMPT` |
 | `src/stormy_ai/tools/` | LangChain tool implementations |
-| `main.py` / `app/web.py` | Human-facing entry points |
+| `main.py` | CLI entry point |
+| `docs/DEPLOYMENT.md` | Docker, ECR, ECS Fargate |
