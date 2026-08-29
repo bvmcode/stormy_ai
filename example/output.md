@@ -1,134 +1,100 @@
 # Weather Briefing — Atco, NJ 08004
 
-- Generated: 2026-08-28T01:44:45+00:00
+- Updated: Saturday, August 29, 2026 12:00 PM Eastern
+- Next update: Saturday, August 29, 2026 6:00 PM Eastern
+- Generated: 2026-08-29T14:26:25-04:00
 - Type: weather
 
 ---
 
-All tools have returned successfully. Here is the complete weather briefing for Atco, NJ.
-
----
-
-# Weather Briefing — Atco, NJ 08004 (39.77°N, 74.89°W)
-
-*Issued for the overnight hours of Thursday, August 27, 2026 (EDT)*
-
 ## Headline
-
-The evening's flash-flood and severe thunderstorm threat is winding down across Camden County, with Atco currently clear and quiet — but a **Flood Watch remains in effect through late tonight**, and a cold front crossing the area **Friday afternoon brings a renewed 50% chance of showers and thunderstorms** before a dry, pleasant weekend settles in Saturday and Sunday.
+A dry, pleasantly cool late-August evening is underway in Atco under high pressure, but a warm and increasingly humid pattern returns Sunday with daily chances for showers and thunderstorms from Sunday evening through midweek — with Tuesday and Wednesday flagged as the days to watch for heavier rain and stronger storms.
 
 ## Active Alerts
-
-| Alert | Severity | Timing | Practical Impact |
-|---|---|---|---|
-| **Flood Watch** | Severe | Effective 10:26 PM EDT Aug 27; expires 4:00 AM EDT Aug 28 ("through late tonight") | Flash flooding caused by excessive rainfall continues to be possible. Rainfall totals of 1–2 inches, with localized 3–5 inches possible in the strongest storms; rain rates of 1–3 inches per hour. Flooding may occur in poor-drainage and urban areas. Atco is included via **Camden County**. |
-
-Note: The Area Forecast Discussion also references a **Severe Thunderstorm Watch** that covered all of New Jersey through 8 PM this evening — that watch has now expired, and no severe thunderstorm watch or warning is active for Atco at this hour. Monitor for any late Flash Flood Warnings before the Flood Watch expires around midnight.
+No active watches, warnings, or advisories for Atco, NJ (Camden County). The NWS Mount Holly (KPHI) watch/warning section lists none for NJ, and no marine hazards are in effect.
 
 ## Current Weather
+Atco is enjoying a classic post-frontal, dry late-summer afternoon:
 
-**NWS Surface Observation — Mount Holly, South Jersey Regional Airport (KVAY)**, 12.1 miles from Atco, elevation 49 ft, observed **9:25 PM EDT Thursday (01:25 UTC Aug 28)**:
+- **Station observation (KVAY – Mount Holly, South Jersey Regional Airport, 12.1 miles from Atco, elevation 49 ft, observed 2026-08-29 18:10 UTC / 2:10 PM EDT):** Clear skies, temperature 77°F (25.0°C), dewpoint 52°F (11.0°C), relative humidity 41%, wind NNE at 7 mph, pressure 30.23 inHg (1023.7 mb), visibility 10 miles, clouds clear at 12,500 ft. No precipitation reported in the past 1, 3, or 6 hours. Heat index 76°F.
+- **MRMS (18:20 UTC):** No surface precipitation at Atco or anywhere within the 30 km analysis radius — 0% echo coverage, 0.0 mm/hr everywhere, and no radar echo or surface precipitation within 100 km.
+- **NEXRAD Level II (KPHL/TPHL, 20.3 km away, 0.4° tilt, 18:17 UTC):** Essentially clear-air conditions. Mean reflectivity is just 1.19 dBZ with a 90th percentile of 7.5 dBZ; the isolated 44.88 dBZ maximum is a single anomalous gate with **zero** gates at or above 50 dBZ — not organized precipitation. Beam height over Atco is only ~159 m MSL, so sampling is excellent near the ground.
+- **Lightning (GOES-19 GLM, 50 km radius, 10-minute window):** Zero flashes, steady trend — no electrically active storms nearby.
+- **Deterministic diagnosis:** Confirms dry conditions at and near Atco (confidence 0.89), no convection, no hail signal, and no virga — though the dry lower atmosphere (10.4°C dewpoint depression) would favor virga if any high-based echoes drifted in.
 
-- **Temperature:** 68°F (20.0°C)
-- **Dewpoint:** 66°F (19.0°C) — very humid air mass, dewpoint depression of only ~2°F
-- **Relative humidity:** 94%
-- **Wind:** South at 3 mph (170°) — nearly calm
-- **Pressure:** 29.94 inHg (1013.9 mb)
-- **Visibility:** 10 miles
-- **Sky:** Clear (CLR) — no cloud deck reported below 12,500 ft
-- **Present weather:** None reported; no precipitation in the past 1, 3, or 6 hours
-
-**Precipitation (MRMS, 9:40 PM EDT):** No precipitation detected at Atco itself (0.00 in/hr). However, light precipitation **is present nearby**: the nearest surface precipitation is **12.6 km away** and the nearest radar echo just **8.3 km away**. Within a 30-km radius, coverage is minimal (0.3% for surface precip, 10.5% for echoes), with a max rate of only 1.3 mm/hr (~0.05 in/hr) and max reflectivity of 24 dBZ — light, decaying shower debris rather than active storms.
-
-**Radar (NEXRAD KTPHL, 9:34 PM EDT):** The Philadelphia-area radar, 20.3 km from Atco, samples Atco at a very low beam height (mean 191 m MSL — excellent low-level sampling). Within 30 km, mean reflectivity is -3 dBZ (essentially clear air), but a **maximum of 43.75 dBZ** was detected somewhere in the analysis domain — consistent with a small, weakening shower or residual storm core nearby. No gates reached 50 dBZ, indicating no robust convection in the immediate area. The deterministic diagnosis confirms: **no precipitation at the location, weak non-convective echoes nearby, no hail signal, and no virga signature** (overall confidence 0.89).
-
-**Lightning (GOES-19 GLM, 9:32–9:42 PM EDT):** **Zero flashes** within 50 km in the past 10 minutes, with a steady (flat) trend. The evening's electrically active convection has shut down.
-
-**Bottom line for right now:** After a day of widespread heavy storms and flooding reports across New Jersey, Atco is sitting under clear skies, warm and very humid (68°F / dewpoint 66°F), with only faint, weakening radar echoes a few miles away. The main residual risk is localized flooding from earlier rainfall until the Flood Watch expires around midnight.
-
-<img src="https://stormy-ai-files.s3.amazonaws.com/radar/2026-08-28/01_34.png" alt="NEXRAD KTPHL reflectivity around Atco NJ" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/radar/2026-08-29/18_17.png" alt="NEXRAD reflectivity near Atco, NJ" width="720" />
 
 ## Current Synoptic Setup
+Per the NWS Mount Holly Area Forecast Discussion (issued 2:15 PM EDT Sat Aug 29, 2026), **high pressure remains in control through tonight**, holding a cooler and much drier airmass over South Jersey. Winds are light north-to-northeast, gradually shifting southwesterly after 20Z — the leading edge of a return flow that will rebuild heat and humidity Sunday.
 
-Per the NWS Mount Holly (KPHI) Area Forecast Discussion (3:18 PM EDT Thursday):
-
-- **Surface pattern:** A **cold front is approaching and expected to pass through the area on Friday**. Ahead of it, a warm, humid, unstable air mass has been in place all day, fueling widespread showers and thunderstorms across New Jersey, eastern Pennsylvania, and Delaware. The heaviest precipitation has been along the **I-95 corridor and points northwest**, with the I-78 corridor also flagged for heavy rain. General storm totals of 1–2 inches, with localized QPF exceeding 3 inches, have produced numerous road-closure flooding reports.
-- **Convective environment Thursday afternoon:** CAM/HREF guidance showed SBCAPE of 1500–2500 J/kg (ensemble maxima >3000 J/kg), ~30 kt deep-layer shear with a strongly veering profile, and more-backed surface winds than earlier forecasts — supporting an **isolated tornado risk along and west of I-95**, with **damaging winds and hail the primary threats**. Dominant storm mode was multicell, with a supercell not ruled out. SPC had a Slight Risk (2/5) covering much of the area.
-- **Upper-level pattern:** The veering, sheared profile and southwest flow aloft (HRRR shows 500-mb winds WSW at ~28 kt, 250-mb SW at ~76 kt) indicate a progressive pattern with the front and its associated trough moving through Friday.
-- **What's next:** The key forecast question is the **timing of Friday's cold front** — and whether it arrives as a single front or a front followed by a reinforcing shot of cooler, drier air. Models differ on both timing and structure. Behind the front, Saturday and Sunday look dry for most of the area (low shower probabilities linger in southern areas Saturday).
+The HRRR analysis (17Z cycle) shows the dry signature clearly: surface temperature 23.7°C with a dewpoint of only 13.2°C, and a dramatically dry mid-level column — relative humidity drops from ~70% near 875 hPa to under 10% above 700 hPa. This is a classic post-frontal subsiding airmass under surface high pressure. The AFD notes the next chapter: **broad upper-level ridging returns to the eastern US early next week**, with surface high pressure over the East, pushing highs into the mid 80s to low 90s (about 5°F above average for early September) and dewpoints back into the upper 60s to low 70s. Convection potential returns Sunday, focused mainly along and northwest of the I-95 corridor, with instability the limiting factor. Forecasters are also watching storms rotating around the ridge periphery and the position of a warm front next week, with **Tuesday and Wednesday the main days to monitor for heavy rain and severe weather potential**.
 
 ## GFS Guidance
+All guidance below is from the **GFS 2026-08-29 12Z cycle** (model guidance, not an observation or official forecast).
 
-**GFS cycle: 2026-08-27 18Z** (pgrb2.0p25), point guidance for Atco at forecast hours 24, 48, and 72.
+**Day 1 — valid 12Z Sun Aug 30 (hour 24):** Surface high pressure (1022.7 hPa at Atco) still dominates, with light 10-m winds (~5 kt). At 500 hPa, heights are 588.5 dam with weak positive vorticity (3.1×10⁻⁵ s⁻¹) and 30 kt flow — a flat, benign ridge-adjacent pattern. 850-hPa relative humidity is a modest 78% with 17 kt flow, and the 300-hPa jet is a relaxed 36 kt. Point temps: 21.1°C (70°F) with dewpoint 17.1°C (63°F) — the humidity recovery beginning.
 
-**Day 1 — Fri Aug 28, 18Z (2 PM EDT, F24):** Surface pressure 1015.4 hPa; 2-m temperature **30.8°C (87°F)** with dewpoint 17.4°C (63°F); light 10-m wind (1.8 kt); a trace precipitation rate (0.127 mm/hr) consistent with lingering shower activity near the departing front. At 500 mb, heights of 583.5 dam with modest vorticity (10.7×10⁻⁵ s⁻¹) and 32-kt WSW flow — a weak short-wave/trough axis nearby. **850-mb relative humidity is high at 86.9%** with light southerly 850-mb flow (5.7 kt), showing the moist layer still in place ahead of/with the front. The 300-mb jet is robust at **79.7 kt** — strong upper flow supporting Friday's storm dynamics.
+**Day 2 — valid 12Z Mon Aug 31 (hour 48):** Pressure eases to 1019.0 hPa as the high slides; dewpoint jumps to 20.2°C (68°F), confirming the humid return. 500-hPa heights hold near 588.7 dam with near-zero vorticity (0.4×10⁻⁵ s⁻¹) — deep ridging, little large-scale lift. 850-hPa RH drops to 64% with lighter 12 kt flow; 300-hPa winds strengthen to 41.5 kt as the jet tightens on the ridge's northern flank.
 
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/surface/24.png" alt="GFS surface day 1 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/500mb/24.png" alt="GFS 500-mb day 1 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/850mb/24.png" alt="GFS 850-mb day 1 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/300mb/24.png" alt="GFS 300-mb day 1 guidance" width="720" />
+**Day 3 — valid 12Z Tue Sep 1 (hour 72):** MSLP falls further to 1016.6 hPa with dewpoint 21.2°C (70°F) — a deep tropical-feeling airmass. A trace precipitation rate (0.006 mm/hr) appears at the point, and 850-hPa winds ramp to 23.4 kt with RH 66% — increasing low-level moisture transport and forcing on the ridge periphery, consistent with the AFD's Tuesday/Wednesday concern. 500-hPa vorticity turns slightly negative (-0.5×10⁻⁵ s⁻¹) with 35.7 kt flow; 300-hPa winds reach 43.1 kt.
 
-**Day 2 — Sat Aug 29, 18Z (2 PM EDT, F48):** The front has passed. Surface pressure rises to **1021.7 hPa** (building high pressure), temperature 28.7°C (84°F), and the **dewpoint drops sharply to 10.0°C (50°F)** — a dramatically drier air mass. Precipitation rate 0.0 mm/hr. 850-mb humidity falls to 69.1% with light northerly low-level flow (7.3 kt). The 500-mb pattern flattens (586.6 dam, vorticity down to 7.1×10⁻⁵ s⁻¹, 25.6-kt flow), and the 300-mb jet weakens locally to 32 kt as the strong jet core lifts away. Classic post-frontal, dry, tranquil pattern.
+The overall GFS story: a quiet, ridged, warming and moistening pattern with the first meaningful synoptic-scale stirring arriving around day 3.
 
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/surface/48.png" alt="GFS surface day 2 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/500mb/48.png" alt="GFS 500-mb day 2 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/850mb/48.png" alt="GFS 850-mb day 2 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/300mb/48.png" alt="GFS 300-mb day 2 guidance" width="720" />
+**Day 1 (hour 24) charts:**
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/surface/24.png" alt="GFS surface day 1 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/500mb/24.png" alt="GFS 500-mb day 1 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/850mb/24.png" alt="GFS 850-mb day 1 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/300mb/24.png" alt="GFS 300-mb day 1 guidance" width="720" />
 
-**Day 3 — Sun Aug 30, 18Z (2 PM EDT, F72):** Modest moistening and warming as southwesterly return flow develops ahead of the next system. Temperature 29.9°C (86°F), dewpoint back up to 18.6°C (66°F), pressure easing to 1019.4 hPa, and a light precipitation signal (0.109 mm/hr) hinting at the very early stages of the next disturbance. **850-mb humidity jumps to 98.3% with a strengthening 18.2-kt 850-mb flow** — deep moisture returning. 500-mb heights rise slightly (588.4 dam) with weak vorticity; 300-mb winds increase to ~40 kt as the jet reorganizes. This sets up a warm, increasingly humid start to the new week.
+**Day 2 (hour 48) charts:**
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/surface/48.png" alt="GFS surface day 2 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/500mb/48.png" alt="GFS 500-mb day 2 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/850mb/48.png" alt="GFS 850-mb day 2 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/300mb/48.png" alt="GFS 300-mb day 2 guidance" width="720" />
 
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/surface/72.png" alt="GFS surface day 3 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/500mb/72.png" alt="GFS 500-mb day 3 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/850mb/72.png" alt="GFS 850-mb day 3 guidance" width="720" />
-<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-27/300mb/72.png" alt="GFS 300-mb day 3 guidance" width="720" />
+**Day 3 (hour 72) charts:**
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/surface/72.png" alt="GFS surface day 3 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/500mb/72.png" alt="GFS 500-mb day 3 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/850mb/72.png" alt="GFS 850-mb day 3 guidance" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-29/300mb/72.png" alt="GFS 300-mb day 3 guidance" width="720" />
 
 ## HRRR Analysis
+The following is **HRRR model guidance** from the 2026-08-29 17Z cycle, valid 17Z (1 PM EDT) at the grid point 0.36 km from Atco — not an observed balloon sounding.
 
-**HRRR cycle: 2026-08-28 00Z (F00, valid 8 PM EDT Aug 27)**, grid point 0.36 km from Atco. Note: the HRRR surface temperature and pressure fields were missing in this cycle's output; the model dewpoint (19.8°C / 67.6°F) is available and agrees well with the KVAY observation (66°F).
+- **Surface thermodynamics:** 23.7°C (74.7°F) and dewpoint 13.2°C (55.8°F) — a 10.4°C spread, indicating a dry, comfortable airmass. Surface pressure 1019.3 hPa.
+- **Precipitation-type guidance:** Categorical "none" — no rain, snow, freezing rain, or ice pellets. Freezing level is very high at 4,338 m MSL (~14,230 ft), as expected in late August; no warm-nose or winter concerns whatsoever.
+- **Instability:** Surface-based, mixed-layer, and most-unstable CAPE are all **0 J/kg** with 0 J/kg CIN — the atmosphere is completely stable for convection right now. DCAPE of 767 J/kg reflects the dry mid-level air (relevant only if convection were present, for downdraft potential).
+- **Moisture:** Precipitable water is just 18.0 mm (0.71 in) — well below the ~35–50 mm typical of humid summer convective days in South Jersey. The K index of -6.0 is about as dry as it gets; Total Totals of 35.4 is also sub-threshold.
+- **Lapse rates:** 5.5°C/km surface-to-3 km and 6.0°C/km in the 700–500 hPa layer — near-neutral, not steep enough to support strong convection.
+- **Wind/shear:** 0–1 km bulk shear 8.9 kt, 0–3 km 16.6 kt, 0–6 km 24.6 kt — modest deep-layer shear, mostly unidirectional westerly aloft (850 hPa SW at 16 kt, 500 hPa W at 23 kt, 250 hPa SW at 85 kt). Winds veer from NW near 925 hPa to SW by 850 hPa.
+- **Parcel levels:** LCL at 873 hPa (~1,319 m AGL) — relatively high, consistent with the dry boundary layer; no LFC or EL exists because there is no instability to release.
 
-**Precipitation-type guidance:** Categorical output is "none" at the analysis time — no rain, snow, freezing rain, or ice pellets. Freezing level is very high at **4,080 m MSL (~13,400 ft)**, and the entire profile is warm; no warm-nose or winter-type complications exist. Any precipitation through the period will be all-liquid rain.
-
-**HRRR-derived model sounding (00Z cycle, valid 00Z Aug 28, ~1.7 hours old):** This is model guidance at the nearest HRRR grid point, not an observed balloon sounding.
-
-- **Surface thermo:** 22.3°C (72°F) / dewpoint 19.2°C (66.6°F) at 1000 hPa — a saturated-ish, warm boundary layer.
-- **Instability:** Surface-based CAPE **388 J/kg** with CIN **-114 J/kg**; most-unstable CAPE 391 J/kg (CIN -89 J/kg); mixed-layer CAPE 175 J/kg. Modest instability with a meaningful cap — consistent with the evening lull after daytime convection. DCAPE of 821 J/kg indicates decent downdraft potential energy if storms redevelop Friday.
-- **Parcel levels:** LCL very low at ~396 m AGL (955.7 hPa) — efficient rain production and low cloud bases; LFC at ~2,673 m AGL (a substantial cap between LCL and LFC); equilibrium level near 8,953 m AGL.
-- **Moisture:** Precipitable water **38.4 mm (1.51 in)** — a very moist airmass, well above the late-August climatological norm, which is why training storms produced flash flooding today.
-- **Lapse rates:** 5.3°C/km surface–3 km (weak); 6.2°C/km 700–500 mb (near-neutral mid-levels) — limited steep lapse rates, so the environment favors heavy-rain producers over hail machines.
-- **Shear:** 0–1 km bulk shear 19.5 kt (mostly southerly), 0–6 km 27.2 kt with strong veering (S at low levels → WSW aloft) — adequate deep-layer shear for organized multicells Friday, though not "strong" by severe standards.
-- **Indices:** K index 31.6; Total Totals 47.2.
-- **Wind profile highlights:** 925 mb S at 14 kt; 850 mb SSW at 14 kt; 700 mb WSW at 15 kt; 500 mb WSW at 28 kt; 300 mb SW at 49 kt; 250 mb SW at 76 kt.
-
-**Interpretation:** The current environment is capped and stabilizing (evening), but the moisture (PW ~1.5 in), low LCLs, and veering shear profile remain in place for Friday's frontal passage — the ingredients for another round of heavy-rain thunderstorms Friday afternoon, with modest instability and the primary hazard being rainfall rather than large hail.
+In short, the HRRR environment fully supports the quiet, dry evening now underway, with no convective potential until moisture and instability rebuild Sunday.
 
 ## Outlook
+The NWS Mount Holly discussion frames the next several days around two key messages:
 
-Synthesizing the KPHI Area Forecast Discussion (3:18 PM EDT Thu):
+1. **Tonight:** High pressure holds with a cooler, much drier airmass. Lows in the mid 50s to low 60s, with **patchy fog possible after midnight** in sheltered areas — light/calm winds will let temperatures radiate to near saturation, especially where recent rainfall left residual ground moisture. Increasing clouds late should temper fog potential, so widespread or dense fog is not expected.
+2. **Sunday onward:** Warmer, more humid conditions return under broad upper-level ridging, with **daily shower/thunderstorm chances into midweek**. Storms Sunday should be isolated to widely scattered and focused mainly along and NW of I-95; instability is the limiting factor. **Severe storms are unlikely**, but gusty winds, small hail, and brief heavy downpours are possible with any stronger cell. The AFD explicitly flags **Tuesday and Wednesday** as the days to monitor for heavy rain and severe weather potential as storms rotate around the ridge periphery and a warm front's position becomes a factor — timing, location, and intensity remain uncertain at this range.
 
-- **What changed:** The Flood Watch was expanded to include the Lehigh Valley and Berks County; a Severe Thunderstorm Watch was issued for all of New Jersey through 8 PM (now expired); flooding reports continued across NJ and eastern PA through the afternoon.
-- **Key messages:** (1) The threat of strong-to-severe thunderstorms and flash flooding continued through Thursday evening — that threat is now diminishing as storms exit and radar/lightning go quiet. (2) **A cold front passes through the area on Friday**, and its timing is critical to Friday's thunderstorm risk; models differ on whether it's a single front or a front with a reinforcing shot of cooler air behind it.
-- **Short-term thinking:** Friday carries a chance of showers and thunderstorms, mainly after noon, with locally heavy rain possible. Saturday and Sunday appear **dry across most of the area**, with only low-probability shower/storm chances in southern areas Saturday.
-- **Hazards:** Residual flash-flooding risk through late tonight (Flood Watch until ~4 AM EDT); renewed heavy-rain potential Friday afternoon/evening; a **MODERATE rip-current risk at the Jersey Shore** through Friday (relevant if you're heading east). Aviation: MVFR conditions possible in Friday's showers/storms, then prevailing VFR Saturday–Monday.
-- **Confidence:** High confidence in the dry weekend; moderate confidence in Friday storm timing given model differences on frontal structure and speed.
+Aviation: VFR today and tonight (small fog chance for southern terminals), with possible restrictions in afternoon/evening showers and storms Sunday through Thursday. Marine: no prevailing hazards; a **MODERATE rip current risk** exists at the Jersey Shore today, dropping to LOW on Sunday. Forecast confidence is high through tonight, moderate Sunday, and lower for the midweek convective details.
 
 ## Forecast for Next 3 Days
 
-### Tonight (Thu 8 PM – Fri 6 AM EDT)
-- **Low: 69°F.** Mostly cloudy, with a slight chance (20%) of showers/thunderstorms **before 2 AM**; new rainfall less than a tenth of an inch. South wind 0–5 mph.
-- Hourly detail: temperatures slide from 75°F at 8 PM to 69°F by 4–6 AM; RH pinned at 97–100%; winds near calm; PoP peaks at 20% around midnight then falls to 6–7% by dawn. **Flood Watch expires 4 AM.**
+**Today (Saturday, Aug 29) — This Afternoon:**
+Mostly sunny, high near 81°F. Northwest wind 0–5 mph. Precipitation chance 0%. Hourly detail: 80–81°F through mid-afternoon with dewpoints in the mid 50s and RH 42–45%, easing to 79°F by 6 PM. A beautiful, dry late-summer day.
 
-### Friday, August 28 (Day 1)
-- **High: 85°F / Low: 66°F.** Partly sunny morning, then a **chance (50–52%) of showers and thunderstorms after noon**, tapering before midnight. New rainfall a tenth to a quarter inch, but locally heavier amounts possible in any strong storm. Winds light (NW 0–5 mph).
-- Hourly detail: morning dry and muggy (69°F at 6 AM → 78°F by 11 AM, RH 85–100%); PoP jumps from 15% at noon to **52% from 2–4 PM** (the prime storm window), staying 38–50% through 7 PM, then dropping to 13–18% after 9 PM. Dewpoints hold in the low 70s°F all day — oppressive humidity.
-- **Hazards:** Locally heavy rain / minor flash flooding possible under slow-moving storms; GFS shows the strong 300-mb jet (80 kt) still overhead, supporting organized convection.
+**Tonight:**
+Mostly clear, then **patchy fog after midnight**. Low around 59°F. Calm wind. Precipitation chance 0%. Hourly rows show temperatures falling from 76°F at 7 PM to 61–63°F overnight with RH climbing to 93–100% and dewpoints holding near 61°F — textbook radiational cooling fog conditions. Commuters Sunday morning should allow extra time for fog.
 
-### Saturday, August 29 (Day 2)
-- **High: 85°F / Low: 65°F.** **Mostly sunny and dry — PoP just 2%.** Northeast wind 0–5 mph. The post-frontal airmass arrives: dewpoints fall from ~67°F to the mid-60s°F, and GFS shows the dewpoint crashing to 50°F with surface pressure building to 1021.7 hPa. Comfortable, clear night (mostly clear, low 65°F).
+**Sunday (Day 1):**
+**Patchy fog before 9 AM**, then mostly sunny with a high near 85°F. Southwest wind 0–10 mph. A **slight chance of showers and thunderstorms** in the afternoon (20% chance), with hourly PoP climbing from ~4% at noon to 21–22% by 5–6 PM as dewpoints surge into the upper 60s to near 70°F. Sunday night: a slight chance of storms before 7 PM, then a **chance of showers and thunderstorms between 7 PM and 2 AM** (30% chance), mostly cloudy, low around 68°F. Any storms that form could produce gusty winds, small hail, or brief downpours, but severe weather is unlikely.
 
-### Sunday, August 30 (Day 3)
-- **High: 87°F / Low: 70°F.** **Sunny all day — PoP 0–7%.** Light SW wind 0–5 mph. Humidity begins creeping back (dewpoints rising to ~70°F by afternoon as SW return flow develops; GFS 850-mb RH at 98% signals deep moisture returning). Partly cloudy Sunday night, low 70°F.
-- **Looking beyond:** Monday turns mostly sunny and warmer (high 89°F) with a slight (9%) storm chance — the next disturbance approaches as the moist airmass fully re-establishes.
+**Monday (Day 2):**
+Partly sunny, high near 86°F. Light wind. A **slight chance of rain showers between 2 and 5 PM**, then a slight chance of showers and thunderstorms (20% chance). Morning hours are dry with PoP ~12–13% and dewpoints around 70–71°F — humid. Monday night: a slight chance of storms before 8 PM, then a **chance of showers and thunderstorms** (40% chance), mostly cloudy, low around 68°F, with **new rainfall amounts of a tenth to a quarter inch possible**. The convective window is clearly shifting to the overnight hours.
+
+**Tuesday (Day 3):**
+A **chance of showers and thunderstorms** (30% chance), partly sunny, high near 86°F, south wind 0–5 mph. Morning PoP dips to ~7% before rising through the afternoon. Tuesday night: a chance of showers and thunderstorms (40% chance), mostly cloudy, low around 70°F. This is the first of the days the AFD flags for monitoring heavier rain and severe potential as the ridge-periphery flow and warm front interact — details remain uncertain, so check back for updates.
 
 ## Bottom Line
-
-Atco is quiet right now — clear skies, 68°F, dewpoint 66°F, no lightning, and only faint decaying echoes within 10 km — but a **Flood Watch remains in effect until 4 AM Friday** due to the day's excessive rainfall, so avoid flooded roads overnight. **Friday afternoon (roughly 2–7 PM) is the next active window**: a 50% chance of thunderstorms along the passing cold front, with locally heavy rain the main hazard. **Saturday and Sunday are the pick of the period** — mostly sunny, mid-80s, PoP ≤7%, and noticeably drier air Saturday as high pressure builds in. Humidity and warmth return Sunday into Monday, setting up the next chance of storms early next week.
+Enjoy tonight: it's dry, clear, and comfortable (77°F, 41% humidity at observation time), with patchy fog likely after midnight and lows near 59°F. Sunday warms to the mid 80s with returning humidity and a slight (20%) chance of afternoon storms, then a better (30%) chance Sunday evening into the overnight. Monday and Tuesday both reach the mid 80s with daily storm chances rising to 30–40%, and Tuesday into Wednesday is the window the NWS is watching for heavier rain and possible stronger storms. No alerts are in effect, and severe weather is not expected through the weekend — but keep an eye on updated forecasts for the midweek convective potential.

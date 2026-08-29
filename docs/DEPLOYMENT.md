@@ -21,15 +21,23 @@ When no location argument is passed, `config.yaml` `briefing.default_location` i
 
 ### Makefile targets
 
+Run `make help` (or plain `make`) to list targets. Common ones:
+
 | Target | Purpose |
 |--------|---------|
+| `make help` | List all targets and descriptions |
 | `make build` | Build and tag image for your AWS account ECR |
 | `make auth` | `docker login` to ECR |
 | `make push` | Push `:latest` to ECR |
 | `make build_and_push` | Build, auth, push |
 | `make local_run` | Run container with creds from `.env` and `aws configure` |
 | `make shell` | Interactive bash in the image |
+| `make exec_shell` | Bash into a running container (`CONTAINER=<id>` optional) |
 | `make lint` / `make format` | Code quality (not container-specific) |
+| `make infra-bootstrap` | Create `stormy-ai/hf-token` secret if missing |
+| `make infra-plan` | `terraform plan` in `infra/` |
+| `make infra-apply` | Bootstrap secret and `terraform apply` |
+| `make infra-run-task` | One-off ECS Fargate briefing run |
 
 Image URI pattern:
 
@@ -47,8 +55,10 @@ Terraform in [`infra/`](../infra/) provisions:
 |----------|---------|
 | ECS cluster `stormy-ai` | Fargate cluster with Container Insights |
 | Task definition `wx-briefing-agent` | 16 vCPU / 120 GiB ARM64 container |
+| EventBridge Scheduler schedule | Runs the task at midnight, 6am, noon, and 6pm (`infra/eventbridge.tf`) |
 | IAM execution role | Pull ECR image, write CloudWatch logs, read Secrets Manager |
 | IAM task role | Read/write `stormy-ai-files` S3 bucket |
+| IAM Scheduler role | `ecs:RunTask` + `iam:PassRole` for scheduled launches |
 | Security group | Egress-only (outbound internet for APIs and HF router) |
 | CloudWatch log group | `/ecs/wx-briefing-agent` (14-day retention) |
 
@@ -66,6 +76,26 @@ make infra-apply
 ```
 
 `infra-apply` runs `infra-bootstrap` automatically so the secret exists before the task definition references it.
+
+### Scheduled briefings (EventBridge Scheduler)
+
+After `make infra-apply`, **EventBridge Scheduler** (`aws_scheduler_schedule.briefing` in `infra/eventbridge.tf`) runs the ECS task on this cron:
+
+```text
+cron(0 0,6,12,18 * * ? *)   → midnight, 6am, noon, 6pm
+```
+
+The schedule timezone defaults to `America/New_York` (`briefing_schedule_timezone` in `infra/variables.tf`). The default location is `Atco, NJ 08004` (`default_location` in `infra/variables.tf`), passed as the container command to `main.py`.
+
+Briefing markdown headers include the scheduled **Updated** and **Next update** times for this cadence (computed in `briefing.briefing_schedule_times`, aligned with the Terraform schedule).
+
+Useful Terraform outputs after apply:
+
+```bash
+terraform -chdir=infra output briefing_schedule_name
+terraform -chdir=infra output briefing_schedule_expression
+terraform -chdir=infra output briefing_schedule_timezone
+```
 
 ### Run a one-off briefing on Fargate
 
@@ -103,6 +133,7 @@ aws logs tail /ecs/wx-briefing-agent --follow --region us-east-1
 Successful runs upload:
 
 - Briefing markdown → `s3://stormy-ai-files/briefings/<date>/<zip>/<time>.md`
+- Latest pointer → `s3://stormy-ai-files/latest.txt` (single-line `s3://` URI of the newest briefing; override key with `BRIEFING_LATEST_S3_KEY`)
 - Radar PNG → `s3://stormy-ai-files/radar/<date>/<time>.png`
 - GFS charts → `s3://stormy-ai-files/models/gfs/<date>/<type>/<hour>.png`
 
@@ -117,6 +148,7 @@ Public embed URLs use `https://<bucket>.s3.amazonaws.com/<key>` unless `STORMY_S
 | LLM | Ollama or HF (your choice in `config.yaml`) | HF via `HF_TOKEN` secret (typical) |
 | AWS creds | `aws configure` or env vars | Task IAM role |
 | Image arch | Host Python or `make local_run` (arm64) | ARM64 Fargate |
+| Schedule | Manual (`python main.py`) | EventBridge Scheduler — 4× daily US Eastern |
 | Config | `config.yaml` + `.env` | Baked into image; override via env if needed |
 
 For local development with Ollama, run `python main.py` directly — no Docker or ECS required. S3 uploads still need valid AWS credentials when enabled.

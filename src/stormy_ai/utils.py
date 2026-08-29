@@ -63,6 +63,26 @@ def upload_public_s3_object(
     return s3_uri
 
 
+def upload_s3_text(
+    content: str,
+    s3_uri: str,
+    content_type: str = "text/plain",
+) -> str:
+    """Upload a text payload to S3."""
+
+    if not s3_uri.startswith("s3://"):
+        raise ValueError(f"Expected an s3:// URI, got: {s3_uri!r}")
+
+    filesystem = s3fs.S3FileSystem(anon=False)
+    with filesystem.open(
+        s3_uri.removeprefix("s3://"),
+        "wb",
+        ContentType=content_type,
+    ) as handle:
+        handle.write(content.encode("utf-8"))
+    return s3_uri
+
+
 def as_dict_or_none(value) -> dict | None:
     """Return *value* when it is a dict, otherwise ``None``."""
 

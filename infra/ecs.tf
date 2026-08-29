@@ -81,12 +81,12 @@ resource "aws_ecs_task_definition" "wx_briefing_agent" {
 
   container_definitions = jsonencode([
     {
-      name      = var.container_name
-      image     = var.ecr_image
-      essential = true
-      cpu       = var.task_cpu
-      memory    = var.task_memory
-      command   = length(local.container_command) > 0 ? local.container_command : null
+      name        = var.container_name
+      image       = var.ecr_image
+      essential   = true
+      cpu         = var.task_cpu
+      memory      = var.task_memory
+      command     = length(local.container_command) > 0 ? local.container_command : null
       environment = local.container_environment
       secrets = [
         {

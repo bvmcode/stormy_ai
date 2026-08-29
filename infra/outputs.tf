@@ -58,6 +58,21 @@ output "cloudwatch_log_group_name" {
   value       = aws_cloudwatch_log_group.task.name
 }
 
+output "briefing_schedule_name" {
+  description = "EventBridge Scheduler schedule that runs the briefing task four times daily."
+  value       = aws_scheduler_schedule.briefing.name
+}
+
+output "briefing_schedule_expression" {
+  description = "Cron schedule for briefing runs (midnight, 6am, noon, 6pm in briefing_schedule_timezone)."
+  value       = aws_scheduler_schedule.briefing.schedule_expression
+}
+
+output "briefing_schedule_timezone" {
+  description = "Timezone for the briefing EventBridge schedule."
+  value       = aws_scheduler_schedule.briefing.schedule_expression_timezone
+}
+
 output "run_task_example" {
   description = "Example aws ecs run-task command with public IP for internet access."
   value       = <<-EOT

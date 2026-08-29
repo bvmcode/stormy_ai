@@ -67,5 +67,11 @@ variable "log_retention_days" {
 variable "default_location" {
   description = "Default location argument passed to main.py when the task runs."
   type        = string
-  default     = ""
+  default     = "Atco, NJ 08004"
+}
+
+variable "briefing_schedule_timezone" {
+  description = "IANA timezone for the EventBridge briefing schedule."
+  type        = string
+  default     = "America/New_York"
 }

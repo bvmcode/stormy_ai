@@ -17,7 +17,7 @@ Each run produces a structured **weather briefing** with:
 - Outlook from the forecast discussion
 - Day-by-day forecast for the next three days
 
-Briefings are written locally under `briefings/` and uploaded to S3. Radar PNGs from `plot_nexrad_level2` and GFS chart PNGs from `get_gfs_guidance` are saved locally (`radar_plots/`, `model_plots/`) and uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs.
+Briefings are written locally under `briefings/` and uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the four-times-daily schedule (midnight, 6am, noon, 6pm US Eastern). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2` and GFS chart PNGs from `get_gfs_guidance` are saved locally (`radar_plots/`, `model_plots/`) and uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs.
 
 ---
 
@@ -30,7 +30,7 @@ User (CLI or ECS task)
             → LLM + 12 weather tools
             → diagnose_precipitation when MRMS + HRRR are ready
         → markdown briefing (+ radar/GFS images via HTTPS)
-        → local file + S3 upload
+        → local file + S3 upload (+ latest.txt pointer)
 ```
 
 - **LangGraph** orchestrates the tool loop and shared weather state.
@@ -76,7 +76,19 @@ python main.py                     # default: Atco, NJ 08004
 python main.py "Denver, CO"
 ```
 
-The CLI prints the briefing, writes a timestamped file under `briefings/`, and uploads it to S3 when credentials are available. Radar and GFS images are embedded as sized HTML `<img>` tags pointing at public HTTPS object URLs.
+The CLI prints the briefing, writes a timestamped file under `briefings/`, and uploads it to S3 when credentials are available. On success it also updates `s3://<bucket>/latest.txt` with the new briefing URI. Radar and GFS images are embedded as sized HTML `<img>` tags pointing at public HTTPS object URLs.
+
+---
+
+## Makefile
+
+Docker builds, linting, and ECS/Terraform helpers live in the [`Makefile`](Makefile). List every target and what it does:
+
+```bash
+make help
+```
+
+Running plain `make` (no target) shows the same summary.
 
 ---
 
@@ -101,7 +113,7 @@ docker run --rm \
   wx_briefing_agent "Denver, CO"
 ```
 
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push and ECS Fargate.
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the four-times-daily EventBridge Scheduler.
 
 ---
 
@@ -154,6 +166,7 @@ Environment variables override `config.yaml` when set:
 | `GFS_MODEL_PLOT_DIR` | `model_plots` | Local GFS chart PNG directory |
 | `BRIEFING_S3_BUCKET` | `stormy-ai-files` | S3 bucket for briefing uploads |
 | `BRIEFING_S3_PREFIX` | `briefings` | Key prefix for briefing markdown |
+| `BRIEFING_LATEST_S3_KEY` | `latest.txt` | Bucket-root key holding the newest briefing `s3://` URI |
 | `RADAR_S3_BUCKET` | `stormy-ai-files` | S3 bucket for radar plot uploads |
 | `RADAR_S3_PREFIX` | `radar` | Key prefix for radar PNGs |
 | `GFS_S3_BUCKET` | `stormy-ai-files` | S3 bucket for GFS chart uploads |
@@ -164,6 +177,7 @@ S3 object layout:
 
 ```text
 s3://stormy-ai-files/briefings/<YYYY-MM-DD>/<zip_code>/<HH_MM>.md
+s3://stormy-ai-files/latest.txt                              ← s3:// URI of newest briefing
 s3://stormy-ai-files/radar/<YYYY-MM-DD>/<HH>_<MM>.png
 s3://stormy-ai-files/models/gfs/<YYYY-MM-DD>/<image_type>/<forecast_hour>.png
 ```
@@ -175,6 +189,7 @@ No API keys are required for NWS, Open-Meteo geocoding, MRMS, HRRR (via Herbie),
 ## Development
 
 ```bash
+make help      # list all Makefile targets
 make lint      # flake8 + isort check
 make format    # black + isort
 uv run python -m unittest discover -s tests -v
@@ -214,7 +229,7 @@ stormy_ai/
 ├── Makefile                Docker build, lint, Terraform/ECS helpers
 ├── README.md               This file
 ├── pyproject.toml          Package and dependencies
-├── infra/                  Terraform for ECS Fargate
+├── infra/                  Terraform for ECS Fargate + EventBridge Scheduler
 ├── docs/
 │   ├── AGENT.md            LangGraph agent orchestration
 │   ├── DEPLOYMENT.md       Docker, ECR, and ECS Fargate
@@ -241,7 +256,7 @@ stormy_ai/
 | Doc | Contents |
 |-----|----------|
 | [`docs/AGENT.md`](docs/AGENT.md) | LangGraph graph, state, tool loop, diagnosis injection |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Docker image, ECR, Terraform, ECS Fargate run-task |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Docker image, ECR, Terraform, ECS Fargate, scheduled runs |
 | [`docs/tools/GEOCODE.md`](docs/tools/GEOCODE.md) | Open-Meteo place → lat/lon |
 | [`docs/tools/NWS.md`](docs/tools/NWS.md) | Forecast, alerts, obs, AFD |
 | [`docs/tools/MRMS.md`](docs/tools/MRMS.md) | Current precip / reflectivity mosaic |

@@ -22,6 +22,8 @@ def main() -> None:
     print(f"\nWrote {result['briefing_path']}")
     if result.get("briefing_s3_uri"):
         print(f"Uploaded {result['briefing_s3_uri']}")
+        if result.get("briefing_latest_s3_uri"):
+            print(f"Updated {result['briefing_latest_s3_uri']}")
     elif result.get("briefing_s3_upload_error"):
         print(f"S3 upload failed: {result['briefing_s3_upload_error']}")
 

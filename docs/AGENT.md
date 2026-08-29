@@ -55,7 +55,7 @@ CLI (main.py)  or  ECS Fargate container
         │
         ├─► 12 LangChain tools (src/stormy_ai/tools/)
         ├─► diagnose_precipitation() (diagnostics.py)
-        └─► write_briefing_markdown() → local file + S3 upload
+        └─► write_briefing_markdown() → local file + S3 upload + latest.txt
 ```
 
 There is **no separate planner or synthesizer node**. The same `agent` node both decides which tools to call and writes the final briefing once it has enough data.
@@ -212,7 +212,7 @@ On the next `agent` hop, `build_system_prompt` can inject that diagnosis.
    - `ensure_radar_image_markdown` — embed radar via `markdown_image_url` (public HTTPS)
    - `ensure_gfs_guidance_markdown` — insert day 1–3 GFS charts if the model omitted them
    - `normalize_briefing_images` — convert markdown links and bare URLs to sized `<img>` tags
-5. `write_briefing_markdown` — write `briefings/YYYY-MM-DD_HHMM_<slug>.md` and upload to S3
+5. `write_briefing_markdown` — prepend schedule metadata (**Updated** / **Next update** for the four-times-daily Eastern cadence), write `briefings/YYYY-MM-DD_HHMM_<slug>.md`, upload to S3, and update `latest.txt` at the bucket root
 
 There is a single briefing type: **weather** (`DEFAULT_BRIEFING_TYPE = "weather"`). Older “current vs daily” modes are gone; the prompt and runner always produce the same sectioned report (headline, alerts, current weather, synoptic setup, GFS guidance, HRRR analysis, outlook, 3-day forecast, bottom line).
 
@@ -255,7 +255,7 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 7. Once MRMS + HRRR exist, collect_weather sets diagnosis
 8. agent sees <weather_diagnosis> and writes markdown sections
 9. agent returns text with no tool_calls → graph END
-10. briefing markdown is post-processed (radar/GFS embeds) and written locally + uploaded to S3
+10. briefing markdown is post-processed (radar/GFS embeds), written locally, uploaded to S3, and `latest.txt` is updated with the new briefing URI
 ```
 
 ---
@@ -275,12 +275,13 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 | Path | Role |
 |------|------|
 | `src/stormy_ai/agent.py` | Graph, state, collect/diagnose injection |
-| `src/stormy_ai/briefing.py` | `run_briefing`, markdown post-processing, S3 upload |
+| `src/stormy_ai/briefing.py` | `run_briefing`, schedule headers, markdown post-processing, S3 upload + `latest.txt` |
 | `src/stormy_ai/config.py` | `config.yaml` loader and env overrides |
 | `src/stormy_ai/llm.py` | Ollama / Hugging Face chat model factory |
-| `src/stormy_ai/utils.py` | S3 upload, `s3://` → HTTPS, tool-content parsing |
+| `src/stormy_ai/utils.py` | S3 upload, `upload_s3_text`, `s3://` → HTTPS, tool-content parsing |
 | `src/stormy_ai/diagnostics.py` | Deterministic precip / storm fusion |
 | `src/stormy_ai/prompts/__init__.py` | `SYSTEM_PROMPT` |
 | `src/stormy_ai/tools/` | LangChain tool implementations |
-| `main.py` | CLI entry point |
-| `docs/DEPLOYMENT.md` | Docker, ECR, ECS Fargate |
+| `main.py` | CLI entry point (prints briefing path, S3 URI, and `latest.txt` update) |
+| `infra/eventbridge.tf` | EventBridge Scheduler — four daily ECS runs |
+| `docs/DEPLOYMENT.md` | Docker, ECR, ECS Fargate, scheduled runs |

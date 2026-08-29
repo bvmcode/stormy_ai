@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from langchain_core.messages import ToolMessage
 
@@ -14,10 +15,15 @@ from stormy_ai.utils import (
     parse_tool_content,
     s3_uri_to_https_url,
     upload_public_s3_object,
+    upload_s3_text,
 )
 
 DEFAULT_LOCATION = "Atco, NJ 08004"
 DEFAULT_BRIEFING_TYPE = "weather"
+
+# Briefing cadence matches the EventBridge schedule in infra/eventbridge.tf.
+BRIEFING_SCHEDULE_TZ = ZoneInfo("America/New_York")
+BRIEFING_SCHEDULE_HOURS = (0, 6, 12, 18)
 
 # Display width for inline briefing charts. Wide enough to read labels on
 # GFS/radar plots, narrow enough that a dozen embeds stay skimmable.
@@ -31,11 +37,50 @@ BRIEFING_DIR.mkdir(parents=True, exist_ok=True)
 
 BRIEFING_S3_BUCKET = os.environ.get("BRIEFING_S3_BUCKET", "stormy-ai-files")
 BRIEFING_S3_PREFIX = os.environ.get("BRIEFING_S3_PREFIX", "briefings").strip("/")
+BRIEFING_LATEST_S3_KEY = os.environ.get("BRIEFING_LATEST_S3_KEY", "latest.txt")
 
 ZIP_CODE_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
 MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+|s3://[^)\s]+)\)")
 HTML_IMG_RE = re.compile(r"<img\b([^>]*)>", re.IGNORECASE)
+_LLM_STATUS_PREAMBLE_RE = re.compile(
+    r"^All tools have returned successfully[^\n]*\n?",
+    re.IGNORECASE,
+)
+_BRIEFING_H1_RE = re.compile(
+    r"^#\s+Weather Briefing\b[^\n]*\n?",
+    re.IGNORECASE,
+)
+_ISSUED_FOR_RE = re.compile(
+    r"^(?:\*\*Issued for:?\*\*[^\n]*|\*Issued for[^*\n]*\*|Issued for:[^\n]*)\n?",
+    re.IGNORECASE,
+)
+_HRULE_LINE_RE = re.compile(r"^---\s*\n?")
 
+
+def strip_llm_briefing_preamble(text: str) -> str:
+    """
+    Remove duplicate LLM title lines and status preamble before the first section.
+
+    ``write_briefing_markdown`` prepends its own document header; models often
+    still emit ``# Weather Briefing ...`` and optional "Issued for" metadata.
+    """
+
+    remaining = text.lstrip("\n")
+    changed = True
+    while changed and remaining:
+        changed = False
+        for pattern in (
+            _LLM_STATUS_PREAMBLE_RE,
+            _HRULE_LINE_RE,
+            _BRIEFING_H1_RE,
+            _ISSUED_FOR_RE,
+        ):
+            match = pattern.match(remaining)
+            if match:
+                remaining = remaining[match.end() :].lstrip("\n")
+                changed = True
+                break
+    return remaining
 
 def build_briefing_request(location: str) -> str:
     """Build the user message that drives a full-tool briefing run."""
@@ -52,6 +97,8 @@ def build_briefing_request(location: str) -> str:
         "get_forecast, and forecast_discussion. For GFS guidance use "
         "day-one, day-two, and day-three forecast hours 24, 48, and 72. "
         "Write the final briefing only after all tools have been used. "
+        "Do not include a top-level title, issued-for header, or status "
+        "preamble; start directly with ## Headline. "
         "Embed radar and GFS charts as sized HTML images using each tool's "
         "markdown_image_url, for example "
         f'<img src="https://..." alt="..." width="{BRIEFING_IMAGE_WIDTH}" />; '
@@ -341,6 +388,45 @@ def _slugify(location: str) -> str:
     return slug.strip("_") or "briefing"
 
 
+def _schedule_slot(day, hour: int) -> datetime:
+    return datetime(
+        day.year,
+        day.month,
+        day.day,
+        hour,
+        0,
+        tzinfo=BRIEFING_SCHEDULE_TZ,
+    )
+
+
+def briefing_schedule_times(when: datetime | None = None) -> tuple[datetime, datetime]:
+    """
+    Return the current and next scheduled briefing update times.
+
+    Slots are midnight, 6am, noon, and 6pm US Eastern, matching EventBridge.
+    """
+
+    when = (when or datetime.now(BRIEFING_SCHEDULE_TZ)).astimezone(BRIEFING_SCHEDULE_TZ)
+    candidates: list[datetime] = []
+    for day_offset in (-1, 0, 1):
+        day = when.date() + timedelta(days=day_offset)
+        for hour in BRIEFING_SCHEDULE_HOURS:
+            candidates.append(_schedule_slot(day, hour))
+
+    candidates.sort()
+    current_update = max(slot for slot in candidates if slot <= when)
+    next_update = min(slot for slot in candidates if slot > current_update)
+    return current_update, next_update
+
+
+def format_briefing_schedule_time(when: datetime) -> str:
+    """Format a scheduled update time for briefing markdown headers."""
+
+    eastern = when.astimezone(BRIEFING_SCHEDULE_TZ)
+    clock = eastern.strftime("%I:%M %p").lstrip("0")
+    return f"{eastern.strftime('%A, %B')} {eastern.day}, {eastern.year} {clock} Eastern"
+
+
 def extract_zip_code(location: str) -> str:
     """
     Pull a 5-digit ZIP from a place string, or return ``unknown``.
@@ -378,6 +464,20 @@ def briefing_s3_uri(
     return f"s3://{BRIEFING_S3_BUCKET}/{key}"
 
 
+def briefing_latest_s3_uri() -> str:
+    """S3 URI for the bucket-root pointer to the newest briefing markdown."""
+
+    return f"s3://{BRIEFING_S3_BUCKET}/{BRIEFING_LATEST_S3_KEY}"
+
+
+def update_briefing_latest_pointer(briefing_s3_uri: str) -> str:
+    """Write ``latest.txt`` at the bucket root with the briefing ``s3://`` URI."""
+
+    latest_uri = briefing_latest_s3_uri()
+    upload_s3_text(f"{briefing_s3_uri.strip()}\n", latest_uri)
+    return latest_uri
+
+
 def upload_briefing_to_s3(
     local_path: Path | str,
     zip_code: str,
@@ -396,7 +496,9 @@ def upload_briefing_to_s3(
 
     timestamp = when or datetime.now(timezone.utc)
     s3_uri = briefing_s3_uri(timestamp, zip_code)
-    return upload_public_s3_object(path, s3_uri, content_type="text/markdown")
+    upload_public_s3_object(path, s3_uri, content_type="text/markdown")
+    update_briefing_latest_pointer(s3_uri)
+    return s3_uri
 
 
 def write_briefing_markdown(
@@ -418,14 +520,18 @@ def write_briefing_markdown(
     stamp = generated_at.strftime("%Y-%m-%d_%H%M")
     path = BRIEFING_DIR / f"{stamp}_{_slugify(location)}.md"
 
+    body = strip_llm_briefing_preamble(briefing_text)
     body = ensure_radar_image_markdown(
-        briefing_text,
+        body,
         radar_image_url or radar_s3_uri,
     )
     body = ensure_gfs_guidance_markdown(body, gfs_guidance)
 
+    current_update, next_update = briefing_schedule_times(generated_at)
     header = (
         f"# Weather Briefing — {location}\n\n"
+        f"- Updated: {format_briefing_schedule_time(current_update)}\n"
+        f"- Next update: {format_briefing_schedule_time(next_update)}\n"
         f"- Generated: {generated_at.isoformat(timespec='seconds')}\n"
         f"- Type: {DEFAULT_BRIEFING_TYPE}\n\n"
         "---\n\n"
@@ -439,14 +545,17 @@ def write_briefing_markdown(
             zip_code=zip_code,
             when=generated_at,
         )
+        latest_s3_uri = briefing_latest_s3_uri()
         s3_upload_error = None
     except Exception as exc:
         s3_uri = None
+        latest_s3_uri = None
         s3_upload_error = str(exc)
 
     return {
         "briefing_path": path,
         "briefing_s3_uri": s3_uri,
+        "briefing_latest_s3_uri": latest_s3_uri,
         "s3_upload_error": s3_upload_error,
         "zip_code": zip_code,
     }
@@ -470,8 +579,9 @@ def run_briefing(location: str = DEFAULT_LOCATION) -> dict:
     radar_info = extract_radar_plot_info(messages)
     gfs_guidance = extract_gfs_guidance(messages)
     radar_image_url = radar_info["radar_image_url"] or radar_info["radar_s3_uri"]
+    briefing_text = strip_llm_briefing_preamble(_message_text(messages[-1].content))
     briefing_text = ensure_radar_image_markdown(
-        _message_text(messages[-1].content),
+        briefing_text,
         radar_image_url,
     )
     briefing_text = ensure_gfs_guidance_markdown(
@@ -491,6 +601,7 @@ def run_briefing(location: str = DEFAULT_LOCATION) -> dict:
         "briefing": briefing_text,
         "briefing_path": written["briefing_path"],
         "briefing_s3_uri": written["briefing_s3_uri"],
+        "briefing_latest_s3_uri": written["briefing_latest_s3_uri"],
         "briefing_s3_upload_error": written["s3_upload_error"],
         "radar_plot_path": radar_info["radar_plot_path"],
         "radar_s3_uri": radar_info["radar_s3_uri"],

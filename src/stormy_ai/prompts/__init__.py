@@ -267,6 +267,11 @@ Write the final weather briefing in markdown with these sections, in
 this order. Be detailed. Use the tool data fully. Do not compress a
 3-day briefing into a few vague sentences.
 
+Do not include a top-level `#` document title, an "Issued for" header,
+or status messages such as "All tools have returned successfully".
+Location and update metadata are added automatically when the briefing
+is saved. Start directly with the first section below.
+
 ## Headline
 One or two sentences summarizing the most important weather story for
 now through the next three days.

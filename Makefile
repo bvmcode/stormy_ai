@@ -6,23 +6,32 @@ AWS_REGION := us-east-1
 ECR_REPOSITORY_NAME := wx_briefing_agent
 IMAGE := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY_NAME):latest
 
-build:
+.PHONY: help build create auth push build_and_push create_repo local_run shell exec_shell test-creds lint format infra-bootstrap infra-init infra-plan infra-apply infra-run-task
+
+help: ## Show available make targets
+	@echo "Stormy AI — make targets"
+	@echo ""
+	@echo "Usage: make <target>"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+build: ## Build linux/arm64 Docker image and tag for ECR
 	docker buildx build --platform linux/arm64 -t $(IMAGE) .
 
-create:
+create: ## Create the ECR repository (one-time)
 	aws ecr create-repository --repository-name $(ECR_REPOSITORY_NAME) --region $(AWS_REGION)
 
-auth:
+auth: ## Log Docker in to ECR
 	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-push:
+push: ## Push the image to ECR (:latest)
 	docker push $(IMAGE)
 
-build_and_push: build auth push
+build_and_push: build auth push ## Build, authenticate, and push image to ECR
 
-create_repo: auth create
+create_repo: auth create ## Authenticate to ECR and create repository
 
-local_run: 
+local_run: ## Run briefing container (HF_TOKEN + AWS creds from .env / aws configure)
 	docker run --rm \
 		-e HF_TOKEN=$(HF_TOKEN) \
 		-e AWS_DEFAULT_REGION=$(AWS_REGION) \
@@ -30,7 +39,7 @@ local_run:
 		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
 		$(IMAGE)
 
-shell:
+shell: ## Interactive bash shell in the image
 	docker run --rm -it \
 		--entrypoint /bin/bash \
 		-e HF_TOKEN=$(HF_TOKEN) \
@@ -39,7 +48,7 @@ shell:
 		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
 		$(IMAGE)
 
-exec_shell:
+exec_shell: ## Bash into a running container (set CONTAINER=<id> or auto-detect)
 	@container=$${CONTAINER:-$$(docker ps -q --filter ancestor=$(IMAGE) | head -1)}; \
 	if [ -z "$$container" ]; then \
 		echo "No running container found for $(IMAGE)."; \
@@ -49,23 +58,23 @@ exec_shell:
 	fi; \
 	docker exec -it $$container /bin/bash
 
-test-creds:
+test-creds: ## Print HF_TOKEN and AWS creds loaded by the Makefile (debug)
 	@echo $(HF_TOKEN)
 	@echo $(AWS_ACCESS_KEY_ID)
 	@echo $(AWS_SECRET_ACCESS_KEY)
 
-lint:
+lint: ## Run flake8 and isort check on src/ and tests/
 	uv run flake8 --config .flake8 src/ tests/
 	uv run isort --check-only src/ tests/
 
-format:
+format: ## Auto-format with black and isort
 	uv run black -l 100 src/ tests/
 	uv run isort --profile black src/ tests/
 
 INFRA_DIR := infra
 HF_TOKEN_SECRET_NAME := stormy-ai/hf-token
 
-infra-bootstrap:
+infra-bootstrap: ## Create HF_TOKEN secret in Secrets Manager if missing
 	@if aws secretsmanager describe-secret --secret-id $(HF_TOKEN_SECRET_NAME) --region $(AWS_REGION) >/dev/null 2>&1; then \
 		echo "Secret $(HF_TOKEN_SECRET_NAME) already exists."; \
 	else \
@@ -76,16 +85,16 @@ infra-bootstrap:
 		echo "Created secret $(HF_TOKEN_SECRET_NAME)."; \
 	fi
 
-infra-init:
+infra-init: ## terraform init in infra/
 	terraform -chdir=$(INFRA_DIR) init
 
-infra-plan: infra-init
+infra-plan: infra-init ## terraform plan
 	terraform -chdir=$(INFRA_DIR) plan
 
-infra-apply: infra-bootstrap infra-init
+infra-apply: infra-bootstrap infra-init ## Bootstrap secret and terraform apply
 	terraform -chdir=$(INFRA_DIR) apply -auto-approve
 
-infra-run-task:
+infra-run-task: ## Run one ECS Fargate briefing task (manual trigger)
 	@cluster=$$(terraform -chdir=$(INFRA_DIR) output -raw ecs_cluster_name); \
 	task_def=$$(terraform -chdir=$(INFRA_DIR) output -raw task_definition_arn); \
 	expected_cpu=$$(terraform -chdir=$(INFRA_DIR) output -raw task_cpu); \
