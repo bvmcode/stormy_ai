@@ -21,3 +21,7 @@ infra/.terraform/
 infra/terraform.tfstate
 infra/terraform.tfstate.backup
 infra/*.tfvars
+
+./briefings/
+./radar_plots/
+./model_plots/
