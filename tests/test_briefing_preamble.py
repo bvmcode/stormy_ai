@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from stormy_ai.briefing import strip_llm_briefing_preamble
+from stormy_ai.utils import strip_llm_briefing_preamble
 
 
 class BriefingPreambleTests(unittest.TestCase):

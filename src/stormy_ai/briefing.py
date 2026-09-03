@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,80 +10,32 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import ToolMessage
 
 from stormy_ai import graph
+from stormy_ai.config import get_settings
 from stormy_ai.utils import (
+    extract_zip_code,
+    format_briefing_image,
+    message_text,
+    normalize_briefing_images,
     parse_tool_content,
+    public_image_url,
     s3_uri_to_https_url,
+    slugify,
+    strip_llm_briefing_preamble,
     upload_public_s3_object,
     upload_s3_text,
 )
 
-DEFAULT_LOCATION = "Atco, NJ 08004"
-DEFAULT_BRIEFING_TYPE = "weather"
 
-# Briefing cadence matches the EventBridge schedule in infra/eventbridge.tf.
-BRIEFING_SCHEDULE_TZ = ZoneInfo("America/New_York")
-BRIEFING_SCHEDULE_HOURS = (0, 6, 12, 18)
+def _briefing_dir() -> Path:
+    path = Path(get_settings().briefing.dir)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
-# Display width for inline briefing charts. Wide enough to read labels on
-# GFS/radar plots, narrow enough that a dozen embeds stay skimmable.
-BRIEFING_IMAGE_WIDTH = int(os.environ.get("BRIEFING_IMAGE_WIDTH", "720"))
-
-RADAR_PLOT_DIR = Path(os.environ.get("RADAR_PLOT_DIR", "radar_plots"))
-RADAR_PLOT_DIR.mkdir(parents=True, exist_ok=True)
-
-BRIEFING_DIR = Path(os.environ.get("BRIEFING_DIR", "briefings"))
-BRIEFING_DIR.mkdir(parents=True, exist_ok=True)
-
-BRIEFING_S3_BUCKET = os.environ.get("BRIEFING_S3_BUCKET", "stormy-ai-files")
-BRIEFING_S3_PREFIX = os.environ.get("BRIEFING_S3_PREFIX", "briefings").strip("/")
-BRIEFING_LATEST_S3_KEY = os.environ.get("BRIEFING_LATEST_S3_KEY", "latest.txt")
-
-ZIP_CODE_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
-MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+|s3://[^)\s]+)\)")
-HTML_IMG_RE = re.compile(r"<img\b([^>]*)>", re.IGNORECASE)
-_LLM_STATUS_PREAMBLE_RE = re.compile(
-    r"^All tools have returned successfully[^\n]*\n?",
-    re.IGNORECASE,
-)
-_BRIEFING_H1_RE = re.compile(
-    r"^#\s+Weather Briefing\b[^\n]*\n?",
-    re.IGNORECASE,
-)
-_ISSUED_FOR_RE = re.compile(
-    r"^(?:\*\*Issued for:?\*\*[^\n]*|\*Issued for[^*\n]*\*|Issued for:[^\n]*)\n?",
-    re.IGNORECASE,
-)
-_HRULE_LINE_RE = re.compile(r"^---\s*\n?")
-
-
-def strip_llm_briefing_preamble(text: str) -> str:
-    """
-    Remove duplicate LLM title lines and status preamble before the first section.
-
-    ``write_briefing_markdown`` prepends its own document header; models often
-    still emit ``# Weather Briefing ...`` and optional "Issued for" metadata.
-    """
-
-    remaining = text.lstrip("\n")
-    changed = True
-    while changed and remaining:
-        changed = False
-        for pattern in (
-            _LLM_STATUS_PREAMBLE_RE,
-            _HRULE_LINE_RE,
-            _BRIEFING_H1_RE,
-            _ISSUED_FOR_RE,
-        ):
-            match = pattern.match(remaining)
-            if match:
-                remaining = remaining[match.end() :].lstrip("\n")
-                changed = True
-                break
-    return remaining
 
 def build_briefing_request(location: str) -> str:
     """Build the user message that drives a full-tool briefing run."""
 
+    image_width = get_settings().briefing.image_width
     return (
         f"Create a weather briefing for {location}. "
         "The briefing must include immense detail on current weather, "
@@ -101,7 +52,7 @@ def build_briefing_request(location: str) -> str:
         "preamble; start directly with ## Headline. "
         "Embed radar and GFS charts as sized HTML images using each tool's "
         "markdown_image_url, for example "
-        f'<img src="https://..." alt="..." width="{BRIEFING_IMAGE_WIDTH}" />; '
+        f'<img src="https://..." alt="..." width="{image_width}" />; '
         "do not use s3:// links, bare URLs, unsized full-bleed images, or "
         "[text](url) hyperlinks for plots."
     )
@@ -186,76 +137,6 @@ def extract_gfs_guidance(messages) -> dict | None:
     return result
 
 
-def _public_image_url(url: str | None) -> str | None:
-    """Prefer HTTPS for markdown embeds; convert s3:// when needed."""
-
-    if not url:
-        return None
-    if url.startswith("s3://"):
-        return s3_uri_to_https_url(url)
-    return url
-
-
-def format_briefing_image(alt_text: str, image_url: str) -> str:
-    """Return a sized HTML image embed suitable for briefing markdown."""
-
-    url = _public_image_url(image_url)
-    if not url:
-        raise ValueError("An image URL is required for briefing embeds.")
-
-    safe_alt = (
-        alt_text.replace("&", "&amp;")
-        .replace('"', "&quot;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
-    safe_url = (
-        url.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-    )
-    return f'<img src="{safe_url}" alt="{safe_alt}" ' f'width="{BRIEFING_IMAGE_WIDTH}" />'
-
-
-def _normalize_html_img_tag(attributes: str) -> str:
-    """Force briefing image tags onto the shared display width."""
-
-    src_match = re.search(
-        r"""\bsrc\s*=\s*(['"])(.*?)\1""",
-        attributes,
-        flags=re.IGNORECASE,
-    )
-    if not src_match:
-        return f"<img{attributes}>"
-
-    raw_src = src_match.group(2).strip()
-    if not (
-        raw_src.startswith("http://")
-        or raw_src.startswith("https://")
-        or raw_src.startswith("s3://")
-    ):
-        return f"<img{attributes}>"
-
-    alt_match = re.search(
-        r"""\balt\s*=\s*(['"])(.*?)\1""",
-        attributes,
-        flags=re.IGNORECASE,
-    )
-    alt_text = alt_match.group(2) if alt_match else ""
-    return format_briefing_image(alt_text, raw_src)
-
-
-def normalize_briefing_images(briefing_text: str) -> str:
-    """Normalize plot embeds to sized HTML ``<img>`` tags with HTTPS URLs."""
-
-    text = MARKDOWN_IMAGE_RE.sub(
-        lambda match: format_briefing_image(match.group(1), match.group(2)),
-        briefing_text,
-    )
-    return HTML_IMG_RE.sub(
-        lambda match: _normalize_html_img_tag(match.group(1)),
-        text,
-    )
-
-
 def ensure_radar_image_markdown(
     briefing_text: str,
     image_url: str | None,
@@ -265,7 +146,7 @@ def ensure_radar_image_markdown(
     """
 
     text = normalize_briefing_images(briefing_text.strip())
-    image_url = _public_image_url(image_url)
+    image_url = public_image_url(image_url)
 
     if not image_url:
         return text
@@ -317,7 +198,7 @@ def ensure_gfs_guidance_markdown(
         for image in images
         if image.get("include_in_markdown", True)
         and image.get("markdown_image_url")
-        and _public_image_url(image["markdown_image_url"]) not in text
+        and public_image_url(image["markdown_image_url"]) not in text
     ]
     if not missing:
         return text
@@ -346,7 +227,7 @@ def ensure_gfs_guidance_markdown(
 
         forecast_hour = image.get("forecast_hour")
         valid_time = image.get("valid_time") or "unknown valid time"
-        image_url = _public_image_url(image["markdown_image_url"])
+        image_url = public_image_url(image["markdown_image_url"])
         day_number = max(1, round(forecast_hour / 24))
         alt_text = f"GFS {image_type} day {day_number} guidance"
         lines.extend(
@@ -365,37 +246,14 @@ def ensure_gfs_guidance_markdown(
     return text + "\n\n## GFS Guidance\n\n" + chart_markdown
 
 
-def _message_text(content) -> str:
-    """Flatten an LLM message content payload into plain text."""
-
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, str):
-                parts.append(block)
-            elif isinstance(block, dict) and block.get("type") == "text":
-                parts.append(block.get("text") or "")
-        return "\n".join(part for part in parts if part)
-
-    return str(content)
-
-
-def _slugify(location: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "_", location.lower())
-    return slug.strip("_") or "briefing"
-
-
-def _schedule_slot(day, hour: int) -> datetime:
+def _schedule_slot(day, hour: int, tz: ZoneInfo) -> datetime:
     return datetime(
         day.year,
         day.month,
         day.day,
         hour,
         0,
-        tzinfo=BRIEFING_SCHEDULE_TZ,
+        tzinfo=tz,
     )
 
 
@@ -406,12 +264,14 @@ def briefing_schedule_times(when: datetime | None = None) -> tuple[datetime, dat
     Slots are midnight, 6am, noon, and 6pm US Eastern, matching EventBridge.
     """
 
-    when = (when or datetime.now(BRIEFING_SCHEDULE_TZ)).astimezone(BRIEFING_SCHEDULE_TZ)
+    briefing = get_settings().briefing
+    tz = ZoneInfo(briefing.schedule_tz)
+    when = (when or datetime.now(tz)).astimezone(tz)
     candidates: list[datetime] = []
     for day_offset in (-1, 0, 1):
         day = when.date() + timedelta(days=day_offset)
-        for hour in BRIEFING_SCHEDULE_HOURS:
-            candidates.append(_schedule_slot(day, hour))
+        for hour in briefing.schedule_hours:
+            candidates.append(_schedule_slot(day, hour, tz))
 
     candidates.sort()
     current_update = max(slot for slot in candidates if slot <= when)
@@ -422,24 +282,10 @@ def briefing_schedule_times(when: datetime | None = None) -> tuple[datetime, dat
 def format_briefing_schedule_time(when: datetime) -> str:
     """Format a scheduled update time for briefing markdown headers."""
 
-    eastern = when.astimezone(BRIEFING_SCHEDULE_TZ)
+    tz = ZoneInfo(get_settings().briefing.schedule_tz)
+    eastern = when.astimezone(tz)
     clock = eastern.strftime("%I:%M %p").lstrip("0")
     return f"{eastern.strftime('%A, %B')} {eastern.day}, {eastern.year} {clock} Eastern"
-
-
-def extract_zip_code(location: str) -> str:
-    """
-    Pull a 5-digit ZIP from a place string, or return ``unknown``.
-
-    Examples:
-        ``Atco, NJ 08004`` → ``08004``
-        ``New York, NY`` → ``unknown``
-    """
-
-    match = ZIP_CODE_RE.search(location or "")
-    if match:
-        return match.group(1)
-    return "unknown"
 
 
 def briefing_s3_uri(
@@ -453,21 +299,23 @@ def briefing_s3_uri(
     s3://stormy-ai-files/briefings/<YYYY-MM-DD>/<zip_code>/<hh_mm>.md
     """
 
+    storage = get_settings().storage
     when_utc = when.astimezone(timezone.utc)
     safe_zip = re.sub(r"[^0-9A-Za-z_-]+", "_", zip_code.strip()) or "unknown"
     key = (
-        f"{BRIEFING_S3_PREFIX}/"
+        f"{storage.briefing_prefix}/"
         f"{when_utc.strftime('%Y-%m-%d')}/"
         f"{safe_zip}/"
         f"{when_utc.strftime('%H_%M')}.md"
     )
-    return f"s3://{BRIEFING_S3_BUCKET}/{key}"
+    return f"s3://{storage.s3_bucket}/{key}"
 
 
 def briefing_latest_s3_uri() -> str:
     """S3 URI for the bucket-root pointer to the newest briefing markdown."""
 
-    return f"s3://{BRIEFING_S3_BUCKET}/{BRIEFING_LATEST_S3_KEY}"
+    storage = get_settings().storage
+    return f"s3://{storage.s3_bucket}/{storage.latest_s3_key}"
 
 
 def update_briefing_latest_pointer(briefing_s3_uri: str) -> str:
@@ -515,10 +363,11 @@ def write_briefing_markdown(
     Returns local path, S3 URI (if upload succeeded), and any upload error.
     """
 
-    BRIEFING_DIR.mkdir(parents=True, exist_ok=True)
+    briefing_dir = _briefing_dir()
+    briefing_config = get_settings().briefing
     generated_at = datetime.now().astimezone()
     stamp = generated_at.strftime("%Y-%m-%d_%H%M")
-    path = BRIEFING_DIR / f"{stamp}_{_slugify(location)}.md"
+    path = briefing_dir / f"{stamp}_{slugify(location)}.md"
 
     body = strip_llm_briefing_preamble(briefing_text)
     body = ensure_radar_image_markdown(
@@ -533,7 +382,7 @@ def write_briefing_markdown(
         f"- Updated: {format_briefing_schedule_time(current_update)}\n"
         f"- Next update: {format_briefing_schedule_time(next_update)}\n"
         f"- Generated: {generated_at.isoformat(timespec='seconds')}\n"
-        f"- Type: {DEFAULT_BRIEFING_TYPE}\n\n"
+        f"- Type: {briefing_config.briefing_type}\n\n"
         "---\n\n"
     )
     path.write_text(header + body + "\n", encoding="utf-8")
@@ -561,8 +410,11 @@ def write_briefing_markdown(
     }
 
 
-def run_briefing(location: str = DEFAULT_LOCATION) -> dict:
+def run_briefing(location: str | None = None) -> dict:
     """Run the agent graph and return briefing text plus radar plot info."""
+
+    briefing_config = get_settings().briefing
+    location = location or briefing_config.default_location
 
     result = graph.invoke(
         {
@@ -579,7 +431,7 @@ def run_briefing(location: str = DEFAULT_LOCATION) -> dict:
     radar_info = extract_radar_plot_info(messages)
     gfs_guidance = extract_gfs_guidance(messages)
     radar_image_url = radar_info["radar_image_url"] or radar_info["radar_s3_uri"]
-    briefing_text = strip_llm_briefing_preamble(_message_text(messages[-1].content))
+    briefing_text = strip_llm_briefing_preamble(message_text(messages[-1].content))
     briefing_text = ensure_radar_image_markdown(
         briefing_text,
         radar_image_url,
@@ -597,7 +449,7 @@ def run_briefing(location: str = DEFAULT_LOCATION) -> dict:
 
     return {
         "location": location,
-        "briefing_type": DEFAULT_BRIEFING_TYPE,
+        "briefing_type": briefing_config.briefing_type,
         "briefing": briefing_text,
         "briefing_path": written["briefing_path"],
         "briefing_s3_uri": written["briefing_s3_uri"],

@@ -32,9 +32,10 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = [
-          data.aws_secretsmanager_secret.hf_token.arn
-        ]
+        Resource = concat(
+          [data.aws_secretsmanager_secret.hf_token.arn],
+          var.langsmith_tracing_enabled ? [data.aws_secretsmanager_secret.langsmith_api_key[0].arn] : []
+        )
       }
     ]
   })

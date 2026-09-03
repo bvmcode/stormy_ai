@@ -1,7 +1,10 @@
 AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
 AWS_ACCESS_KEY_ID := $(shell aws configure export-credentials | jq -r '.AccessKeyId')
 AWS_SECRET_ACCESS_KEY := $(shell aws configure export-credentials | jq -r '.SecretAccessKey')
-HF_TOKEN := $(shell cat .env | grep HF_TOKEN | cut -d '=' -f 2)
+HF_TOKEN := $(shell grep '^HF_TOKEN=' .env 2>/dev/null | cut -d '=' -f 2-)
+LANGSMITH_API_KEY := $(shell grep '^LANGSMITH_API_KEY=' .env 2>/dev/null | cut -d '=' -f 2-)
+LANGSMITH_PROJECT := $(or $(shell grep '^LANGSMITH_PROJECT=' .env 2>/dev/null | cut -d '=' -f 2- | head -1),stormy-ai)
+LANGSMITH_TRACING_ENABLED := $(shell grep -q '^LANGSMITH_TRACING=true' .env 2>/dev/null && echo true || echo false)
 AWS_REGION := us-east-1
 ECR_REPOSITORY_NAME := wx_briefing_agent
 IMAGE := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY_NAME):latest
@@ -76,28 +79,47 @@ format: ## Auto-format with black and isort
 
 INFRA_DIR := infra
 HF_TOKEN_SECRET_NAME := stormy-ai/hf-token
+LANGSMITH_API_KEY_SECRET_NAME := stormy-ai/langsmith-api-key
 
-infra-bootstrap: ## Create HF_TOKEN secret in Secrets Manager if missing
-	@if aws secretsmanager describe-secret --secret-id $(HF_TOKEN_SECRET_NAME) --region $(AWS_REGION) >/dev/null 2>&1; then \
-		echo "Secret $(HF_TOKEN_SECRET_NAME) already exists."; \
-	else \
-		aws secretsmanager create-secret \
-			--name $(HF_TOKEN_SECRET_NAME) \
-			--secret-string "$(HF_TOKEN)" \
-			--region $(AWS_REGION); \
-		echo "Created secret $(HF_TOKEN_SECRET_NAME)."; \
-	fi
+infra-bootstrap: ## Create HF_TOKEN and LangSmith secrets in Secrets Manager if missing
+	@bootstrap_secret() { \
+		name="$$1"; value="$$2"; optional="$$3"; \
+		if [ -z "$$value" ]; then \
+			if [ "$$optional" = "optional" ]; then \
+				echo "Skipping $$name (not set in .env)."; \
+			else \
+				echo "ERROR: $$name requires a value in .env."; \
+				exit 1; \
+			fi; \
+			return 0; \
+		fi; \
+		if aws secretsmanager describe-secret --secret-id "$$name" --region $(AWS_REGION) >/dev/null 2>&1; then \
+			echo "Secret $$name already exists."; \
+		else \
+			aws secretsmanager create-secret \
+				--name "$$name" \
+				--secret-string "$$value" \
+				--region $(AWS_REGION); \
+			echo "Created secret $$name."; \
+		fi; \
+	}; \
+	bootstrap_secret "$(HF_TOKEN_SECRET_NAME)" "$(HF_TOKEN)"; \
+	bootstrap_secret "$(LANGSMITH_API_KEY_SECRET_NAME)" "$(LANGSMITH_API_KEY)" optional
 
 infra-init: ## terraform init in infra/
 	terraform -chdir=$(INFRA_DIR) init
 
 infra-plan: infra-init ## terraform plan
-	terraform -chdir=$(INFRA_DIR) plan
+	terraform -chdir=$(INFRA_DIR) plan \
+		-var="langsmith_tracing_enabled=$(LANGSMITH_TRACING_ENABLED)" \
+		-var="langsmith_project=$(LANGSMITH_PROJECT)"
 
-infra-apply: infra-bootstrap infra-init ## Bootstrap secret and terraform apply
-	terraform -chdir=$(INFRA_DIR) apply -auto-approve
+infra-apply: infra-bootstrap infra-init ## Bootstrap secrets and terraform apply
+	terraform -chdir=$(INFRA_DIR) apply -auto-approve \
+		-var="langsmith_tracing_enabled=$(LANGSMITH_TRACING_ENABLED)" \
+		-var="langsmith_project=$(LANGSMITH_PROJECT)"
 
-infra-run-task: ## Run one ECS Fargate briefing task (manual trigger)
+run-agent: ## Run one ECS Fargate briefing task (manual trigger)
 	@cluster=$$(terraform -chdir=$(INFRA_DIR) output -raw ecs_cluster_name); \
 	task_def=$$(terraform -chdir=$(INFRA_DIR) output -raw task_definition_arn); \
 	expected_cpu=$$(terraform -chdir=$(INFRA_DIR) output -raw task_cpu); \

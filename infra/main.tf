@@ -48,3 +48,8 @@ data "aws_subnets" "public" {
 data "aws_secretsmanager_secret" "hf_token" {
   name = var.hf_token_secret_name
 }
+
+data "aws_secretsmanager_secret" "langsmith_api_key" {
+  count = var.langsmith_tracing_enabled ? 1 : 0
+  name  = var.langsmith_api_key_secret_name
+}

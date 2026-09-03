@@ -6,9 +6,27 @@ import ast
 import json
 import mimetypes
 import os
+import re
 from pathlib import Path
 
 import s3fs
+
+ZIP_CODE_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
+MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+|s3://[^)\s]+)\)")
+HTML_IMG_RE = re.compile(r"<img\b([^>]*)>", re.IGNORECASE)
+_LLM_STATUS_PREAMBLE_RE = re.compile(
+    r"^All tools have returned successfully[^\n]*\n?",
+    re.IGNORECASE,
+)
+_BRIEFING_H1_RE = re.compile(
+    r"^#\s+Weather Briefing\b[^\n]*\n?",
+    re.IGNORECASE,
+)
+_ISSUED_FOR_RE = re.compile(
+    r"^(?:\*\*Issued for:?\*\*[^\n]*|\*Issued for[^*\n]*\*|Issued for:[^\n]*)\n?",
+    re.IGNORECASE,
+)
+_HRULE_LINE_RE = re.compile(r"^---\s*\n?")
 
 
 def s3_uri_to_https_url(s3_uri: str) -> str:
@@ -165,3 +183,142 @@ def parse_tool_content(content) -> dict | None:
             return parse_tool_content(text)
 
     return None
+
+
+def message_text(content) -> str:
+    """Flatten an LLM message content payload into plain text."""
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text") or "")
+        return "\n".join(part for part in parts if part)
+
+    return str(content)
+
+
+def slugify(text: str) -> str:
+    """Return a filesystem-safe slug derived from *text*."""
+
+    slug = re.sub(r"[^a-z0-9]+", "_", text.lower())
+    return slug.strip("_") or "briefing"
+
+
+def extract_zip_code(location: str) -> str:
+    """
+    Pull a 5-digit ZIP from a place string, or return ``unknown``.
+
+    Examples:
+        ``Atco, NJ 08004`` → ``08004``
+        ``New York, NY`` → ``unknown``
+    """
+
+    match = ZIP_CODE_RE.search(location or "")
+    if match:
+        return match.group(1)
+    return "unknown"
+
+
+def public_image_url(url: str | None) -> str | None:
+    """Prefer HTTPS for markdown embeds; convert s3:// when needed."""
+
+    if not url:
+        return None
+    if url.startswith("s3://"):
+        return s3_uri_to_https_url(url)
+    return url
+
+
+def strip_llm_briefing_preamble(text: str) -> str:
+    """
+    Remove duplicate LLM title lines and status preamble before the first section.
+
+    ``write_briefing_markdown`` prepends its own document header; models often
+    still emit ``# Weather Briefing ...`` and optional "Issued for" metadata.
+    """
+
+    remaining = text.lstrip("\n")
+    changed = True
+    while changed and remaining:
+        changed = False
+        for pattern in (
+            _LLM_STATUS_PREAMBLE_RE,
+            _HRULE_LINE_RE,
+            _BRIEFING_H1_RE,
+            _ISSUED_FOR_RE,
+        ):
+            match = pattern.match(remaining)
+            if match:
+                remaining = remaining[match.end() :].lstrip("\n")
+                changed = True
+                break
+    return remaining
+
+
+def format_briefing_image(alt_text: str, image_url: str, *, width: int | None = None) -> str:
+    """Return a sized HTML image embed suitable for briefing markdown."""
+
+    from stormy_ai.config import get_settings
+
+    url = public_image_url(image_url)
+    if not url:
+        raise ValueError("An image URL is required for briefing embeds.")
+
+    image_width = width if width is not None else get_settings().briefing.image_width
+    safe_alt = (
+        alt_text.replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    safe_url = (
+        url.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+    return f'<img src="{safe_url}" alt="{safe_alt}" width="{image_width}" />'
+
+
+def _normalize_html_img_tag(attributes: str) -> str:
+    """Force briefing image tags onto the shared display width."""
+
+    src_match = re.search(
+        r"""\bsrc\s*=\s*(['"])(.*?)\1""",
+        attributes,
+        flags=re.IGNORECASE,
+    )
+    if not src_match:
+        return f"<img{attributes}>"
+
+    raw_src = src_match.group(2).strip()
+    if not (
+        raw_src.startswith("http://")
+        or raw_src.startswith("https://")
+        or raw_src.startswith("s3://")
+    ):
+        return f"<img{attributes}>"
+
+    alt_match = re.search(
+        r"""\balt\s*=\s*(['"])(.*?)\1""",
+        attributes,
+        flags=re.IGNORECASE,
+    )
+    alt_text = alt_match.group(2) if alt_match else ""
+    return format_briefing_image(alt_text, raw_src)
+
+
+def normalize_briefing_images(briefing_text: str) -> str:
+    """Normalize plot embeds to sized HTML ``<img>`` tags with HTTPS URLs."""
+
+    text = MARKDOWN_IMAGE_RE.sub(
+        lambda match: format_briefing_image(match.group(1), match.group(2)),
+        briefing_text,
+    )
+    return HTML_IMG_RE.sub(
+        lambda match: _normalize_html_img_tag(match.group(1)),
+        text,
+    )

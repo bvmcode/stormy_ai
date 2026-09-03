@@ -7,10 +7,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from stormy_ai.briefing import (
-    BRIEFING_SCHEDULE_TZ,
     briefing_schedule_times,
     format_briefing_schedule_time,
 )
+from stormy_ai.config import get_settings
 
 EASTERN = ZoneInfo("America/New_York")
 
@@ -59,7 +59,10 @@ class BriefingScheduleTests(unittest.TestCase):
         self.assertEqual(formatted, "Saturday, August 29, 2026 6:00 PM Eastern")
 
     def test_schedule_timezone_constant(self) -> None:
-        self.assertEqual(BRIEFING_SCHEDULE_TZ, EASTERN)
+        self.assertEqual(
+            ZoneInfo(get_settings().briefing.schedule_tz),
+            EASTERN,
+        )
 
 
 if __name__ == "__main__":

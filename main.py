@@ -2,18 +2,20 @@
 
 import argparse
 
-from stormy_ai.briefing import DEFAULT_LOCATION, run_briefing
+from stormy_ai.briefing import run_briefing
+from stormy_ai.config import get_settings
 
 
 def main() -> None:
+    default_location = get_settings().briefing.default_location
     parser = argparse.ArgumentParser(
         description="Generate a weather briefing with Stormy AI.",
     )
     parser.add_argument(
         "location",
         nargs="?",
-        default=DEFAULT_LOCATION,
-        help=f"Place name for the briefing (default: {DEFAULT_LOCATION})",
+        default=default_location,
+        help=f"Place name for the briefing (default: {default_location})",
     )
     args = parser.parse_args()
 

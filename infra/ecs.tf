@@ -1,3 +1,21 @@
+variable "langsmith_api_key_secret_name" {
+  description = "Secrets Manager secret name that stores LANGSMITH_API_KEY."
+  type        = string
+  default     = "stormy-ai/langsmith-api-key"
+}
+
+variable "langsmith_tracing_enabled" {
+  description = "Enable LangSmith tracing in the ECS task (requires bootstrap secret)."
+  type        = bool
+  default     = false
+}
+
+variable "langsmith_project" {
+  description = "LangSmith project name for traces."
+  type        = string
+  default     = "stormy-ai"
+}
+
 resource "aws_cloudwatch_log_group" "task" {
   name              = "/ecs/${var.task_family}"
   retention_in_days = var.log_retention_days
@@ -27,7 +45,18 @@ resource "aws_security_group" "task" {
 }
 
 locals {
-  container_environment = [
+  langsmith_environment = var.langsmith_tracing_enabled ? [
+    {
+      name  = "LANGSMITH_TRACING"
+      value = "true"
+    },
+    {
+      name  = "LANGSMITH_PROJECT"
+      value = var.langsmith_project
+    },
+  ] : []
+
+  container_environment = concat([
     {
       name  = "AWS_DEFAULT_REGION"
       value = var.aws_region
@@ -60,7 +89,19 @@ locals {
       name  = "OPENBLAS_NUM_THREADS"
       value = "8"
     },
-  ]
+  ], local.langsmith_environment)
+
+  container_secrets = concat([
+    {
+      name      = "HF_TOKEN"
+      valueFrom = data.aws_secretsmanager_secret.hf_token.arn
+    },
+    ], var.langsmith_tracing_enabled ? [
+    {
+      name      = "LANGSMITH_API_KEY"
+      valueFrom = data.aws_secretsmanager_secret.langsmith_api_key[0].arn
+    },
+  ] : [])
 
   container_command = var.default_location != "" ? [var.default_location] : []
 }
@@ -88,12 +129,7 @@ resource "aws_ecs_task_definition" "wx_briefing_agent" {
       memory      = var.task_memory
       command     = length(local.container_command) > 0 ? local.container_command : null
       environment = local.container_environment
-      secrets = [
-        {
-          name      = "HF_TOKEN"
-          valueFrom = data.aws_secretsmanager_secret.hf_token.arn
-        }
-      ]
+      secrets     = local.container_secrets
       logConfiguration = {
         logDriver = "awslogs"
         options = {

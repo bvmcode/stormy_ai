@@ -17,8 +17,12 @@ llm:
 
 briefing:
   default_location: "Atco, NJ 08004"
+  briefing_type: weather
   dir: briefings
   image_width: 720
+  # Cadence matches the EventBridge schedule in infra/eventbridge.tf.
+  schedule_tz: America/New_York
+  schedule_hours: [0, 6, 12, 18]
 
 paths:
   radar_plot_dir: radar_plots
@@ -27,6 +31,7 @@ paths:
 storage:
   s3_bucket: stormy-ai-files
   briefing_prefix: briefings
+  latest_s3_key: latest.txt
   radar_prefix: radar
   gfs_prefix: models/gfs
   public_base_url: ""

@@ -76,8 +76,11 @@ class LLMConfig:
 @dataclass(frozen=True)
 class BriefingConfig:
     default_location: str
+    briefing_type: str
     dir: str
     image_width: int
+    schedule_tz: str
+    schedule_hours: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,7 @@ class PathsConfig:
 class StorageConfig:
     s3_bucket: str
     briefing_prefix: str
+    latest_s3_key: str
     radar_prefix: str
     gfs_prefix: str
     public_base_url: str
@@ -107,6 +111,14 @@ class Settings:
 def _section(data: dict[str, Any], key: str) -> dict[str, Any]:
     value = data.get(key, {})
     return value if isinstance(value, dict) else {}
+
+
+def _parse_schedule_hours(value: Any) -> tuple[int, ...]:
+    if value is None:
+        return (0, 6, 12, 18)
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("briefing.schedule_hours must be a list of integers.")
+    return tuple(int(hour) for hour in value)
 
 
 def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
@@ -138,6 +150,8 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         briefing["dir"] = briefing_dir
     if image_width := os.environ.get("BRIEFING_IMAGE_WIDTH"):
         briefing["image_width"] = int(image_width)
+    if schedule_tz := os.environ.get("BRIEFING_SCHEDULE_TZ"):
+        briefing["schedule_tz"] = schedule_tz
     raw["briefing"] = briefing
 
     paths = _section(raw, "paths")
@@ -152,6 +166,8 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         storage["s3_bucket"] = bucket
     if prefix := os.environ.get("BRIEFING_S3_PREFIX"):
         storage["briefing_prefix"] = prefix
+    if latest_key := os.environ.get("BRIEFING_LATEST_S3_KEY"):
+        storage["latest_s3_key"] = latest_key
     if radar_prefix := os.environ.get("RADAR_S3_PREFIX"):
         storage["radar_prefix"] = radar_prefix
     if gfs_prefix := os.environ.get("GFS_S3_PREFIX"):
@@ -190,8 +206,11 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
         ),
         briefing=BriefingConfig(
             default_location=str(briefing_raw.get("default_location", "Atco, NJ 08004")),
+            briefing_type=str(briefing_raw.get("briefing_type", "weather")),
             dir=str(briefing_raw.get("dir", "briefings")),
             image_width=int(briefing_raw.get("image_width", 720)),
+            schedule_tz=str(briefing_raw.get("schedule_tz", "America/New_York")),
+            schedule_hours=_parse_schedule_hours(briefing_raw.get("schedule_hours")),
         ),
         paths=PathsConfig(
             radar_plot_dir=str(paths_raw.get("radar_plot_dir", "radar_plots")),
@@ -199,7 +218,8 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
         ),
         storage=StorageConfig(
             s3_bucket=str(storage_raw.get("s3_bucket", "stormy-ai-files")),
-            briefing_prefix=str(storage_raw.get("briefing_prefix", "briefings")),
+            briefing_prefix=str(storage_raw.get("briefing_prefix", "briefings")).strip("/"),
+            latest_s3_key=str(storage_raw.get("latest_s3_key", "latest.txt")),
             radar_prefix=str(storage_raw.get("radar_prefix", "radar")),
             gfs_prefix=str(storage_raw.get("gfs_prefix", "models/gfs")),
             public_base_url=str(storage_raw.get("public_base_url", "")),
