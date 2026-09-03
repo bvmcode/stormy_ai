@@ -43,7 +43,6 @@ class WeatherState(MessagesState):
     nexrad: NotRequired[dict | None]
     hrrr: NotRequired[dict | None]
     lightning: NotRequired[dict | None]
-
     diagnosis: NotRequired[dict | None]
 
 
@@ -113,19 +112,14 @@ def get_tool_message_name(
     # Look backward for the AIMessage that requested
     # this tool call.
     for message in reversed(state["messages"]):
-
         if not isinstance(
             message,
             AIMessage,
         ):
             continue
-
         for tool_call in message.tool_calls or []:
-
             if tool_call.get("id") == tool_call_id:
-
                 return tool_call.get("name")
-
     return None
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import tempfile
 import unittest
@@ -14,6 +15,51 @@ from stormy_ai.llm import create_chat_model, huggingface_model_id
 
 
 class ConfigTests(unittest.TestCase):
+    def test_langsmith_env_loaded_from_dotenv(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env_path = Path(tmp) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "LANGSMITH_TRACING=true",
+                        "LANGSMITH_API_KEY=test-key",
+                        "LANGSMITH_PROJECT_NAME=stormy-ai-test",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            previous_cwd = Path.cwd()
+            previous_env = {
+                key: os.environ.get(key)
+                for key in (
+                    "LANGSMITH_TRACING",
+                    "LANGCHAIN_TRACING_V2",
+                    "LANGSMITH_API_KEY",
+                    "LANGSMITH_PROJECT",
+                    "LANGSMITH_PROJECT_NAME",
+                )
+            }
+            for key in previous_env:
+                os.environ.pop(key, None)
+
+            try:
+                os.chdir(tmp)
+                import stormy_ai.config as config_module
+
+                importlib.reload(config_module)
+                self.assertEqual(os.environ.get("LANGSMITH_TRACING"), "true")
+                self.assertEqual(os.environ.get("LANGCHAIN_TRACING_V2"), "true")
+                self.assertEqual(
+                    os.environ.get("LANGSMITH_PROJECT"),
+                    "stormy-ai-test",
+                )
+            finally:
+                os.chdir(previous_cwd)
+                for key, value in previous_env.items():
+                    self._restore_env(key, value)
+                importlib.reload(config_module)
+
     def test_load_settings_from_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "config.yaml"

@@ -16,6 +16,31 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CONFIG_PATH = _PROJECT_ROOT / "config.yaml"
 
 
+def _load_dotenv() -> None:
+    for candidate in (Path.cwd() / ".env", _PROJECT_ROOT / ".env"):
+        if candidate.is_file():
+            load_dotenv(candidate)
+            return
+
+
+def _configure_langsmith_env() -> None:
+    """Normalize LangSmith env vars after .env is loaded.
+
+    LangChain/LangSmith read LANGSMITH_TRACING and LANGSMITH_PROJECT from the
+    environment. We load .env at import time so tracing is active before the
+    agent graph is built.
+    """
+    if project := os.environ.get("LANGSMITH_PROJECT_NAME"):
+        os.environ.setdefault("LANGSMITH_PROJECT", project)
+
+    if os.environ.get("LANGSMITH_TRACING", "").lower() == "true":
+        os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+
+
+_load_dotenv()
+_configure_langsmith_env()
+
+
 def _find_config_path() -> Path:
     env_path = os.environ.get("STORMY_CONFIG")
     if env_path:
@@ -26,13 +51,6 @@ def _find_config_path() -> Path:
         return cwd_config.resolve()
 
     return _DEFAULT_CONFIG_PATH
-
-
-def _load_dotenv() -> None:
-    for candidate in (Path.cwd() / ".env", _PROJECT_ROOT / ".env"):
-        if candidate.is_file():
-            load_dotenv(candidate)
-            return
 
 
 @dataclass(frozen=True)
