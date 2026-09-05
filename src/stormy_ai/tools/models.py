@@ -21,6 +21,7 @@ from matplotlib import pyplot as plt
 from pydantic import BaseModel, Field, field_validator
 from scipy.ndimage import gaussian_filter, maximum_filter, minimum_filter
 
+from stormy_ai.config import s3_uploads_enabled
 from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
 
 plt.switch_backend("Agg")
@@ -1027,17 +1028,21 @@ def generate_latest_gfs_guidance(
                 longitude,
             )
 
-            try:
-                s3_uri = upload_gfs_model_image_to_s3(
-                    local_path=output_path,
-                    model_date=cycle,
-                    image_type=image_type,
-                    forecast_hour=forecast_hour,
-                )
-                s3_upload_error = None
-            except Exception as exc:
+            if s3_uploads_enabled():
+                try:
+                    s3_uri = upload_gfs_model_image_to_s3(
+                        local_path=output_path,
+                        model_date=cycle,
+                        image_type=image_type,
+                        forecast_hour=forecast_hour,
+                    )
+                    s3_upload_error = None
+                except Exception as exc:
+                    s3_uri = None
+                    s3_upload_error = str(exc)
+            else:
                 s3_uri = None
-                s3_upload_error = str(exc)
+                s3_upload_error = None
 
             local_markdown_url = f"/models/{relative_path.as_posix()}"
             https_url = s3_uri_to_https_url(s3_uri) if s3_uri else None
@@ -1050,7 +1055,7 @@ def generate_latest_gfs_guidance(
                 "s3_uri": s3_uri,
                 "https_url": https_url,
                 "s3_upload_error": s3_upload_error,
-                "markdown_image_url": https_url or local_markdown_url,
+                "markdown_image_url": https_url or str(output_path),
                 "include_in_markdown": forecast_hour in markdown_hours,
             }
             forecast_images.append(image)

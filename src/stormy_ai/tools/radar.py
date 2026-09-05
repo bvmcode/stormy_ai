@@ -28,6 +28,7 @@ from metpy.plots import USCOUNTIES
 from pyart.io.nexrad_common import NEXRAD_LOCATIONS
 from pydantic import BaseModel, Field
 
+from stormy_ai.config import s3_uploads_enabled
 from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
 
 # ============================================================
@@ -1594,25 +1595,30 @@ def plot_nexrad_level2(
     clear_radar_volume_cache()
 
     plot_time = _timestamp_from_valid_time(valid_time)
+    local_image_url = str(output_path.resolve())
 
-    try:
-        image_s3_uri = upload_radar_plot_to_s3(
-            output_path,
-            when=plot_time,
-        )
-        s3_upload_error = None
-    except Exception as exc:
+    if s3_uploads_enabled():
+        try:
+            image_s3_uri = upload_radar_plot_to_s3(
+                output_path,
+                when=plot_time,
+            )
+            s3_upload_error = None
+        except Exception as exc:
+            image_s3_uri = None
+            s3_upload_error = str(exc)
+    else:
         image_s3_uri = None
-        s3_upload_error = str(exc)
+        s3_upload_error = None
 
     image_https_url = s3_uri_to_https_url(image_s3_uri) if image_s3_uri else None
 
     return {
         "status": "success",
-        "image_path": str(output_path.resolve()),
+        "image_path": local_image_url,
         "s3_uri": image_s3_uri,
         "https_url": image_https_url,
-        "markdown_image_url": image_https_url,
+        "markdown_image_url": image_https_url or local_image_url,
         "s3_upload_error": s3_upload_error,
         "mime_type": "image/png",
         "field": radar_field,

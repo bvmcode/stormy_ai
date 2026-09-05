@@ -12,16 +12,14 @@ wheels/
 # Local secrets
 .env
 
-# Generated briefings
-briefings/
-model_plots/
-
 # Terraform
 infra/.terraform/
 infra/terraform.tfstate
 infra/terraform.tfstate.backup
 infra/*.tfvars
 
+# Generated briefing artifacts
 briefings/
 radar_plots/
 model_plots/
+forecast_zones/

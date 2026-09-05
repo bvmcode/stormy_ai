@@ -154,20 +154,72 @@ class ForecastZoneCacheTests(unittest.TestCase):
             }
         )
 
-        result = api.ensure_forecast_zone_image(
-            "https://api.weather.gov/zones/forecast/NJZ018",
-            latitude=39.77,
-            longitude=-74.89,
+        with TemporaryDirectory() as tmp:
+            local_path = Path(tmp) / "NJZ018.png"
+            with patch(
+                "stormy_ai.tools.nws.forecast_zone_local_path",
+                return_value=local_path,
+            ):
+                result = api.ensure_forecast_zone_image(
+                    "https://api.weather.gov/zones/forecast/NJZ018",
+                    latitude=39.77,
+                    longitude=-74.89,
+                )
+
+            self.assertEqual(result["status"], "success")
+            self.assertFalse(result["cached"])
+            self.assertTrue(local_path.is_file())
+            mock_upload.assert_called_once()
+            self.assertEqual(
+                mock_upload.call_args.kwargs.get("content_type")
+                or mock_upload.call_args[1].get("content_type"),
+                "image/png",
+            )
+
+    @patch("stormy_ai.tools.nws.upload_public_s3_object")
+    @patch("stormy_ai.tools.nws._s3_object_exists")
+    @patch("stormy_ai.tools.nws.s3_uploads_enabled", return_value=False)
+    def test_ensure_local_only_skips_s3(
+        self,
+        _mock_uploads_enabled,
+        mock_exists,
+        mock_upload,
+    ) -> None:
+        api = NwsApi()
+        api._get = MagicMock(
+            return_value={
+                "geometry": SAMPLE_GEOMETRY,
+                "properties": {"id": "NJZ018", "name": "Camden", "state": "NJ"},
+            }
         )
 
-        self.assertEqual(result["status"], "success")
-        self.assertFalse(result["cached"])
-        mock_upload.assert_called_once()
-        self.assertEqual(
-            mock_upload.call_args.kwargs.get("content_type")
-            or mock_upload.call_args[1].get("content_type"),
-            "image/png",
-        )
+        with TemporaryDirectory() as tmp:
+            local_path = Path(tmp) / "NJZ018.png"
+            with patch(
+                "stormy_ai.tools.nws.forecast_zone_local_path",
+                return_value=local_path,
+            ):
+                result = api.ensure_forecast_zone_image(
+                    "https://api.weather.gov/zones/forecast/NJZ018",
+                    latitude=39.77,
+                    longitude=-74.89,
+                )
+
+                self.assertEqual(result["status"], "success")
+                self.assertFalse(result["cached"])
+                self.assertIsNone(result["s3_uri"])
+                self.assertEqual(result["markdown_image_url"], str(local_path.resolve()))
+                self.assertTrue(local_path.is_file())
+
+                cached = api.ensure_forecast_zone_image(
+                    "https://api.weather.gov/zones/forecast/NJZ018",
+                    latitude=39.77,
+                    longitude=-74.89,
+                )
+
+        self.assertTrue(cached["cached"])
+        mock_exists.assert_not_called()
+        mock_upload.assert_not_called()
 
 
 class ForecastZoneBriefingTests(unittest.TestCase):

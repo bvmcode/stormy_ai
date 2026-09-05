@@ -18,7 +18,7 @@ Each run produces a structured **weather briefing** with:
 - Outlook from the forecast discussion
 - Day-by-day forecast for the next three days
 
-Briefings are written locally under `briefings/` and uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the four-times-daily schedule (midnight, 6am, noon, 6pm US Eastern). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs.
+Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the four-times-daily schedule (midnight, 6am, noon, 6pm US Eastern). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
 
 ---
 
@@ -30,8 +30,8 @@ User (CLI or ECS task)
         → LangGraph: reset → agent ⇄ tools → collect_weather → agent
             → LLM + 12 weather tools
             → diagnose_precipitation when MRMS + HRRR are ready
-        → markdown briefing (+ forecast-zone / radar / GFS images via HTTPS)
-        → local file + S3 upload (+ latest.txt pointer)
+        → markdown briefing (+ forecast-zone / radar / GFS images)
+        → local file (+ S3 upload / latest.txt when upload_to_s3 is enabled)
 ```
 
 - **LangGraph** orchestrates the tool loop and shared weather state.
@@ -51,7 +51,7 @@ Deep dive: [`docs/AGENT.md`](docs/AGENT.md). Per-tool docs: [`docs/tools/`](docs
   - **[Ollama](https://ollama.com/)** running locally with a chat model (e.g. `gemma4:latest`), or
   - **Hugging Face Inference Providers** with `HF_TOKEN` set (see [Configuration](#configuration))
 - System libraries for GRIB/NetCDF and cartography as needed by `cfgrib` / `eccodes` / Cartopy / Py-ART on your OS
-- **AWS credentials** (optional locally) — required for S3 uploads of briefings, radar plots, GFS charts, and forecast-zone maps
+- **AWS credentials** (optional locally) — required only when S3 uploads are enabled (`storage.upload_to_s3: true`, the default)
 
 ---
 
@@ -75,9 +75,11 @@ ollama pull gemma4:latest
 ```bash
 python main.py                     # default: Atco, NJ 08004
 python main.py "Denver, CO"
+python main.py --local             # local files only; skip S3 uploads
+python main.py --local "Denver, CO"
 ```
 
-The CLI prints the briefing, writes a timestamped file under `briefings/`, and uploads it to S3 when credentials are available. On success it also updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags pointing at public HTTPS object URLs (zone maps use `width="480"`; radar/GFS use `720`).
+The CLI prints the briefing and writes a timestamped file under `briefings/`. With S3 uploads enabled (default), it also uploads the briefing and plot images when credentials are available, and updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags (zone maps use `width="480"`; radar/GFS use `720`) — public HTTPS URLs when uploaded, otherwise local absolute paths. With `--local`, artifacts stay under `briefings/`, `radar_plots/`, `model_plots/`, and `forecast_zones/`.
 
 ---
 
@@ -165,6 +167,8 @@ Environment variables override `config.yaml` when set:
 | `BRIEFING_IMAGE_WIDTH` | `720` | Default width (px) for embedded `<img>` tags (forecast-zone maps use `480`) |
 | `RADAR_PLOT_DIR` | `radar_plots` | Local NEXRAD PNG directory |
 | `GFS_MODEL_PLOT_DIR` | `model_plots` | Local GFS chart PNG directory |
+| `FORECAST_ZONE_PLOT_DIR` | `forecast_zones` | Local forecast-zone PNG cache directory |
+| `STORMY_UPLOAD_TO_S3` | `true` | Upload briefings/plots to S3 (`false` = same as `--local`) |
 | `BRIEFING_S3_BUCKET` | `stormy-ai-files` | S3 bucket for briefing uploads |
 | `BRIEFING_S3_PREFIX` | `briefings` | Key prefix for briefing markdown |
 | `BRIEFING_LATEST_S3_KEY` | `latest.txt` | Bucket-root key holding the newest briefing `s3://` URI |
@@ -175,6 +179,8 @@ Environment variables override `config.yaml` when set:
 | `FORECAST_ZONE_S3_BUCKET` | same as briefing bucket | S3 bucket for cached forecast-zone PNGs |
 | `FORECAST_ZONE_S3_PREFIX` | `forecast_zones` | Key prefix (`<prefix>/<ZONE_ID>.png`) |
 | `STORMY_S3_PUBLIC_BASE` | *(empty)* | Override HTTPS base for embed URLs (e.g. CloudFront) |
+
+In `config.yaml`, the same toggle is `storage.upload_to_s3` (default `true`).
 
 S3 object layout:
 
@@ -216,7 +222,7 @@ uv run python -m unittest discover -s tests -v
 | `get_hrrr_environment` | Model thermo, precip-type flags, CAPE/CIN |
 | `get_gfs_guidance` | Latest coherent GFS cycle, point guidance, and day 1–3 surface/500/850/300-mb charts |
 | `analyze_nexrad_level2` | Site radar structure and dual-pol detail |
-| `plot_nexrad_level2` | Radar image for the briefing (local + S3) |
+| `plot_nexrad_level2` | Radar image for the briefing (local; S3 when uploads enabled) |
 | `get_lightning` | Recent GLM total-lightning activity |
 | `analyze_current_skewt` | Full MetPy sounding analysis from HRRR |
 
@@ -244,12 +250,13 @@ stormy_ai/
 ├── briefings/              Generated markdown briefings
 ├── radar_plots/            Generated radar PNGs
 ├── model_plots/            Generated regional GFS chart PNGs
+├── forecast_zones/         Cached forecast-zone PNGs (local)
 └── src/stormy_ai/
     ├── agent.py            LangGraph definition (stormy_ai.graph)
-    ├── briefing.py         run_briefing(), markdown + S3 output
-    ├── config.py           config.yaml loader
+    ├── briefing.py         run_briefing(), markdown + optional S3 output
+    ├── config.py           config.yaml loader (`upload_to_s3`, paths)
     ├── llm.py              LLM provider factory
-    ├── utils.py            S3 upload, tool-content parsing
+    ├── utils.py            S3 upload (gated), tool-content parsing
     ├── diagnostics.py      Deterministic precip / storm fusion
     ├── prompts/            SYSTEM_PROMPT
     └── tools/              LangChain tool implementations

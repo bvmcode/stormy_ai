@@ -72,8 +72,9 @@ NwsApi._get_points()  ←  HTTP GET with User-Agent
    ├─► get_forecast()
    │      ~8 twelve-hour periods + ~72 hourly rows
    │      forecastZone URL → ensure_forecast_zone_image()
-   │           ├─ if s3://…/forecast_zones/<zone>.png exists → reuse
-   │           └─ else fetch zone GeoJSON → plot → upload PNG
+   │           ├─ if uploads enabled and s3://…/forecast_zones/<zone>.png exists → reuse
+   │           ├─ elif local forecast_zones/<zone>.png exists → reuse
+   │           └─ else fetch zone GeoJSON → plot → save locally (+ upload when enabled)
    │
    ├─► forecast_discussion()
    │      CWA → latest Area Forecast Discussion (AFD)
@@ -105,12 +106,13 @@ Official NWS forecast wording is written for a **forecast zone**, not a single l
 **Cache layout**
 
 ```text
-s3://stormy-ai-files/forecast_zones/<ZONE_ID>.png
+forecast_zones/<ZONE_ID>.png                         ← local cache (always)
+s3://stormy-ai-files/forecast_zones/<ZONE_ID>.png    ← when upload_to_s3 is enabled
 ```
 
 Example: `s3://stormy-ai-files/forecast_zones/NJZ018.png`
 
-Before plotting, the code checks whether that object already exists. Zone boundaries change rarely, so maps are reused across briefings for the same zone.
+When S3 uploads are enabled, the code checks whether the object already exists before plotting. Zone boundaries change rarely, so maps are reused across briefings for the same zone. With `--local` / `upload_to_s3: false`, only the local `forecast_zones/` cache is used and `markdown_image_url` is the absolute local path.
 
 **Plot contents**
 
@@ -129,7 +131,7 @@ Unlike the other NWS tools (plain strings), `get_forecast` returns a structured 
 | `status` | `success` or `error` |
 | `forecast` | Human-readable periods + hourly text (includes zone id / `markdown_image_url` header lines) |
 | `forecast_zone` | Zone id, name, state, cache/status metadata |
-| `s3_uri` / `https_url` / `markdown_image_url` | Public image links for the zone map |
+| `s3_uri` / `https_url` / `markdown_image_url` / `image_path` | Image links for the zone map (HTTPS when uploaded; local path when `--local`) |
 
 The briefing post-processor (`ensure_forecast_zone_markdown`) inserts a **Forecast Area** section near the top of the markdown (immediately after **Headline**) if the model omitted the image.
 
@@ -179,5 +181,7 @@ Typical agent flow: **geocode → get_alerts + current_conditions → … → ge
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `FORECAST_ZONE_PLOT_DIR` | `forecast_zones` | Local PNG cache directory |
 | `FORECAST_ZONE_S3_BUCKET` | `BRIEFING_S3_BUCKET` or `stormy-ai-files` | Bucket for cached zone PNGs |
 | `FORECAST_ZONE_S3_PREFIX` | `forecast_zones` | Key prefix (`<prefix>/<ZONE_ID>.png`) |
+| `STORMY_UPLOAD_TO_S3` | `true` | When `false`, skip S3 cache/upload and use local paths only |

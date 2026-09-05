@@ -46,8 +46,9 @@ obscure the underlying forecast.
 `briefing.ensure_gfs_guidance_markdown` inserts the day-one, day-two, and
 day-three URL for each image type if the language model omitted it. Successful
 uploads use the public HTTPS object URL in sized HTML `<img>` tags
-(`https://<bucket>.s3.amazonaws.com/...`); a failed upload records the error
-and falls back to the local relative path.
+(`https://<bucket>.s3.amazonaws.com/...`). When uploads are disabled
+(`--local` / `storage.upload_to_s3: false`) or an upload fails, embeds fall
+back to the absolute local path under `model_plots/`.
 
 GFS remains numerical guidance. Current observations come from NWS/MRMS/radar,
 and the official public forecast and Area Forecast Discussion remain the

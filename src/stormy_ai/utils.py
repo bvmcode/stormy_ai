@@ -66,6 +66,11 @@ def upload_public_s3_object(
     rely on the bucket policy granting ``s3:GetObject`` on the target prefix.
     """
 
+    from stormy_ai.config import s3_uploads_enabled
+
+    if not s3_uploads_enabled():
+        raise RuntimeError("S3 uploads are disabled (storage.upload_to_s3=false).")
+
     path = Path(local_path)
     if not path.is_file():
         raise FileNotFoundError(f"Local file not found: {path}")
@@ -87,6 +92,11 @@ def upload_s3_text(
     content_type: str = "text/plain",
 ) -> str:
     """Upload a text payload to S3."""
+
+    from stormy_ai.config import s3_uploads_enabled
+
+    if not s3_uploads_enabled():
+        raise RuntimeError("S3 uploads are disabled (storage.upload_to_s3=false).")
 
     if not s3_uri.startswith("s3://"):
         raise ValueError(f"Expected an s3:// URI, got: {s3_uri!r}")
@@ -303,11 +313,14 @@ def _normalize_html_img_tag(attributes: str) -> str:
         return f"<img{attributes}>"
 
     raw_src = src_match.group(2).strip()
-    if not (
+    is_remote = (
         raw_src.startswith("http://")
         or raw_src.startswith("https://")
         or raw_src.startswith("s3://")
-    ):
+        or raw_src.startswith("file://")
+    )
+    is_local_path = raw_src.startswith("/") or raw_src.startswith("./")
+    if not (is_remote or is_local_path):
         return f"<img{attributes}>"
 
     alt_match = re.search(

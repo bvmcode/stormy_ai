@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -87,6 +87,7 @@ class BriefingConfig:
 class PathsConfig:
     radar_plot_dir: str
     gfs_model_plot_dir: str
+    forecast_zone_plot_dir: str
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class StorageConfig:
     radar_prefix: str
     gfs_prefix: str
     public_base_url: str
+    upload_to_s3: bool
 
 
 @dataclass(frozen=True)
@@ -119,6 +121,18 @@ def _parse_schedule_hours(value: Any) -> tuple[int, ...]:
     if not isinstance(value, (list, tuple)):
         raise ValueError("briefing.schedule_hours must be a list of integers.")
     return tuple(int(hour) for hour in value)
+
+
+def _parse_bool(value: Any, *, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    raise ValueError(f"{field_name} must be a boolean value.")
 
 
 def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
@@ -159,6 +173,8 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         paths["radar_plot_dir"] = radar_dir
     if gfs_dir := os.environ.get("GFS_MODEL_PLOT_DIR"):
         paths["gfs_model_plot_dir"] = gfs_dir
+    if forecast_zone_dir := os.environ.get("FORECAST_ZONE_PLOT_DIR"):
+        paths["forecast_zone_plot_dir"] = forecast_zone_dir
     raw["paths"] = paths
 
     storage = _section(raw, "storage")
@@ -174,6 +190,11 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         storage["gfs_prefix"] = gfs_prefix
     if public_base := os.environ.get("STORMY_S3_PUBLIC_BASE"):
         storage["public_base_url"] = public_base
+    if upload_to_s3 := os.environ.get("STORMY_UPLOAD_TO_S3"):
+        storage["upload_to_s3"] = _parse_bool(
+            upload_to_s3,
+            field_name="STORMY_UPLOAD_TO_S3",
+        )
     raw["storage"] = storage
 
     return raw
@@ -215,6 +236,9 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
         paths=PathsConfig(
             radar_plot_dir=str(paths_raw.get("radar_plot_dir", "radar_plots")),
             gfs_model_plot_dir=str(paths_raw.get("gfs_model_plot_dir", "model_plots")),
+            forecast_zone_plot_dir=str(
+                paths_raw.get("forecast_zone_plot_dir", "forecast_zones")
+            ),
         ),
         storage=StorageConfig(
             s3_bucket=str(storage_raw.get("s3_bucket", "stormy-ai-files")),
@@ -223,6 +247,10 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
             radar_prefix=str(storage_raw.get("radar_prefix", "radar")),
             gfs_prefix=str(storage_raw.get("gfs_prefix", "models/gfs")),
             public_base_url=str(storage_raw.get("public_base_url", "")),
+            upload_to_s3=_parse_bool(
+                storage_raw.get("upload_to_s3", True),
+                field_name="storage.upload_to_s3",
+            ),
         ),
         config_path=config_path,
     )
@@ -259,4 +287,22 @@ def get_settings() -> Settings:
     global _settings
     if _settings is None:
         _settings = load_settings()
+    return _settings
+
+
+def s3_uploads_enabled() -> bool:
+    """Return whether briefing/image artifacts should be uploaded to S3."""
+
+    return get_settings().storage.upload_to_s3
+
+
+def set_upload_to_s3(enabled: bool) -> Settings:
+    """Override the cached ``storage.upload_to_s3`` setting at runtime."""
+
+    global _settings
+    settings = get_settings()
+    _settings = replace(
+        settings,
+        storage=replace(settings.storage, upload_to_s3=enabled),
+    )
     return _settings

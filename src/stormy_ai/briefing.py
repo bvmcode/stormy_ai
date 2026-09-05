@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from langchain_core.messages import ToolMessage
 
 from stormy_ai import graph
-from stormy_ai.config import get_settings
+from stormy_ai.config import get_settings, s3_uploads_enabled
 from stormy_ai.utils import (
     extract_zip_code,
     format_briefing_image,
@@ -110,6 +110,8 @@ def extract_radar_plot_info(messages) -> dict:
             radar_image_url = result["https_url"]
         elif result.get("s3_uri"):
             radar_image_url = s3_uri_to_https_url(result["s3_uri"])
+        elif result.get("image_path"):
+            radar_image_url = str(Path(result["image_path"]).resolve())
 
     return {
         "radar_plot_path": radar_path,
@@ -149,6 +151,8 @@ def extract_forecast_zone_info(messages) -> dict:
             zone_image_url = result["https_url"]
         elif result.get("s3_uri"):
             zone_image_url = s3_uri_to_https_url(result["s3_uri"])
+        elif result.get("image_path"):
+            zone_image_url = str(Path(result["image_path"]).resolve())
 
     return {
         "forecast_zone_image_url": zone_image_url,
@@ -451,7 +455,10 @@ def write_briefing_markdown(
     forecast_zone_name: str | None = None,
 ) -> dict:
     """
-    Write a timestamped markdown briefing locally and upload it to S3.
+    Write a timestamped markdown briefing locally and optionally upload it to S3.
+
+    When ``storage.upload_to_s3`` is false (or ``--local`` was passed), only the
+    local file is written.
 
     Returns local path, S3 URI (if upload succeeded), and any upload error.
     """
@@ -487,6 +494,15 @@ def write_briefing_markdown(
     path.write_text(header + body + "\n", encoding="utf-8")
 
     zip_code = extract_zip_code(location)
+    if not s3_uploads_enabled():
+        return {
+            "briefing_path": path,
+            "briefing_s3_uri": None,
+            "briefing_latest_s3_uri": None,
+            "s3_upload_error": None,
+            "zip_code": zip_code,
+        }
+
     try:
         s3_uri = upload_briefing_to_s3(
             path,

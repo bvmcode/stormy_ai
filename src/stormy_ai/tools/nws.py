@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import re
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +17,7 @@ import s3fs
 from langchain_core.tools import tool
 from matplotlib import patheffects
 
+from stormy_ai.config import get_settings, s3_uploads_enabled
 from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
 
 FORECAST_ZONE_S3_BUCKET = os.environ.get(
@@ -153,6 +153,15 @@ def forecast_zone_s3_uri(zone_id: str) -> str:
     safe_zone = re.sub(r"[^A-Za-z0-9_-]+", "_", zone_id.strip()) or "unknown"
     key = f"{FORECAST_ZONE_S3_PREFIX}/{safe_zone}.png"
     return f"s3://{FORECAST_ZONE_S3_BUCKET}/{key}"
+
+
+def forecast_zone_local_path(zone_id: str) -> Path:
+    """Local cache path for a forecast-zone PNG."""
+
+    safe_zone = re.sub(r"[^A-Za-z0-9_-]+", "_", zone_id.strip()) or "unknown"
+    plot_dir = Path(get_settings().paths.forecast_zone_plot_dir)
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    return plot_dir / f"{safe_zone}.png"
 
 
 def _zone_id_from_url(forecast_zone_url: str | None) -> str | None:
@@ -490,9 +499,10 @@ class NwsApi:
         longitude: float,
     ) -> dict:
         """
-        Return a public forecast-zone map image, generating it only when missing.
+        Return a forecast-zone map image, generating it only when missing.
 
-        Cached objects live at ``s3://<bucket>/forecast_zones/<zone>.png``.
+        Cached objects live at ``s3://<bucket>/forecast_zones/<zone>.png`` when
+        S3 uploads are enabled, and under ``paths.forecast_zone_plot_dir`` locally.
         """
 
         zone_id = _zone_id_from_url(forecast_zone_url)
@@ -503,32 +513,59 @@ class NwsApi:
             }
 
         s3_uri = forecast_zone_s3_uri(zone_id)
+        local_path = forecast_zone_local_path(zone_id)
+        upload_enabled = s3_uploads_enabled()
         zone_name = ""
         zone_state = ""
 
-        try:
-            if _s3_object_exists(s3_uri):
-                zone_data = self._get(forecast_zone_url)
-                if zone_data:
-                    properties = zone_data.get("properties") or {}
-                    zone_name = str(properties.get("name") or "")
-                    zone_state = str(properties.get("state") or "")
-                https_url = s3_uri_to_https_url(s3_uri)
-                return {
-                    "status": "success",
-                    "zone_id": zone_id,
-                    "zone_name": zone_name,
-                    "zone_state": zone_state,
-                    "s3_uri": s3_uri,
-                    "https_url": https_url,
-                    "markdown_image_url": https_url,
-                    "cached": True,
-                    "s3_upload_error": None,
-                }
-        except Exception:
-            # Fall through and regenerate when the existence check fails
-            # (for example missing credentials in a local scratch run).
-            pass
+        def _zone_metadata() -> tuple[str, str]:
+            zone_data = self._get(forecast_zone_url)
+            if not zone_data:
+                return "", ""
+            properties = zone_data.get("properties") or {}
+            return (
+                str(properties.get("name") or ""),
+                str(properties.get("state") or ""),
+            )
+
+        if upload_enabled:
+            try:
+                if _s3_object_exists(s3_uri):
+                    zone_name, zone_state = _zone_metadata()
+                    https_url = s3_uri_to_https_url(s3_uri)
+                    return {
+                        "status": "success",
+                        "zone_id": zone_id,
+                        "zone_name": zone_name,
+                        "zone_state": zone_state,
+                        "image_path": (
+                            str(local_path.resolve()) if local_path.is_file() else None
+                        ),
+                        "s3_uri": s3_uri,
+                        "https_url": https_url,
+                        "markdown_image_url": https_url,
+                        "cached": True,
+                        "s3_upload_error": None,
+                    }
+            except Exception:
+                # Fall through and regenerate when the existence check fails
+                # (for example missing credentials in a local scratch run).
+                pass
+        elif local_path.is_file():
+            zone_name, zone_state = _zone_metadata()
+            local_url = str(local_path.resolve())
+            return {
+                "status": "success",
+                "zone_id": zone_id,
+                "zone_name": zone_name,
+                "zone_state": zone_state,
+                "image_path": local_url,
+                "s3_uri": None,
+                "https_url": None,
+                "markdown_image_url": local_url,
+                "cached": True,
+                "s3_upload_error": None,
+            }
 
         zone_data = self._get(forecast_zone_url)
         if not zone_data:
@@ -551,47 +588,51 @@ class NwsApi:
                 "error": f"Forecast zone {zone_id} did not include geometry.",
             }
 
-        with tempfile.TemporaryDirectory(prefix="stormy-forecast-zone-") as tmp:
-            output_path = Path(tmp) / f"{zone_id}.png"
-            try:
-                _plot_forecast_zone(
-                    geometry,
-                    zone_id=zone_id,
-                    zone_name=zone_name,
-                    output_path=output_path,
-                )
-            except Exception as exc:
-                return {
-                    "status": "error",
-                    "zone_id": zone_id,
-                    "zone_name": zone_name,
-                    "zone_state": zone_state,
-                    "error": f"Unable to plot forecast zone {zone_id}: {exc}",
-                }
+        try:
+            _plot_forecast_zone(
+                geometry,
+                zone_id=zone_id,
+                zone_name=zone_name,
+                output_path=local_path,
+            )
+        except Exception as exc:
+            return {
+                "status": "error",
+                "zone_id": zone_id,
+                "zone_name": zone_name,
+                "zone_state": zone_state,
+                "error": f"Unable to plot forecast zone {zone_id}: {exc}",
+            }
 
+        local_url = str(local_path.resolve())
+        s3_upload_error = None
+        if upload_enabled:
             try:
                 upload_public_s3_object(
-                    output_path,
+                    local_path,
                     s3_uri,
                     content_type="image/png",
                 )
-                s3_upload_error = None
             except Exception as exc:
                 s3_uri = None
                 s3_upload_error = str(exc)
+        else:
+            s3_uri = None
 
         https_url = s3_uri_to_https_url(s3_uri) if s3_uri else None
+        markdown_image_url = https_url or local_url
         return {
-            "status": "success" if https_url else "error",
+            "status": "success" if markdown_image_url else "error",
             "zone_id": zone_id,
             "zone_name": zone_name,
             "zone_state": zone_state,
+            "image_path": local_url,
             "s3_uri": s3_uri,
             "https_url": https_url,
-            "markdown_image_url": https_url,
+            "markdown_image_url": markdown_image_url,
             "cached": False,
             "s3_upload_error": s3_upload_error,
-            "error": None if https_url else (s3_upload_error or "Upload failed."),
+            "error": None if markdown_image_url else (s3_upload_error or "Upload failed."),
         }
 
     def _format_period(self, period: dict) -> str:
@@ -850,6 +891,7 @@ class NwsApi:
             "s3_uri": zone_image.get("s3_uri"),
             "https_url": zone_image.get("https_url"),
             "markdown_image_url": zone_image.get("markdown_image_url"),
+            "image_path": zone_image.get("image_path"),
         }
 
     def get_alerts(self, latitude: float, longitude: float) -> str:

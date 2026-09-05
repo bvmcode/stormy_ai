@@ -91,6 +91,36 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(settings.llm.temperature, 0.2)
             self.assertEqual(settings.llm.huggingface.inference_provider, "deepinfra")
             self.assertEqual(settings.briefing.default_location, "Denver, CO")
+            self.assertTrue(settings.storage.upload_to_s3)
+
+    def test_upload_to_s3_false_from_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.yaml"
+            config_path.write_text(
+                yaml.dump(
+                    {
+                        "storage": {"upload_to_s3": False},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(config_path)
+            self.assertFalse(settings.storage.upload_to_s3)
+
+    def test_env_overrides_upload_to_s3(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.yaml"
+            config_path.write_text("storage:\n  upload_to_s3: true\n", encoding="utf-8")
+
+            previous = os.environ.get("STORMY_UPLOAD_TO_S3")
+            os.environ["STORMY_UPLOAD_TO_S3"] = "false"
+            try:
+                settings = load_settings(config_path)
+            finally:
+                self._restore_env("STORMY_UPLOAD_TO_S3", previous)
+
+            self.assertFalse(settings.storage.upload_to_s3)
 
     def test_env_overrides_llm_provider(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

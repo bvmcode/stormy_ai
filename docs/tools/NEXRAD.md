@@ -7,7 +7,7 @@ Module: `src/stormy_ai/tools/radar.py`
 | Tool | Role |
 |------|------|
 | `analyze_nexrad_level2` | Structured lowest-tilt moments + dual-pol diagnostics |
-| `plot_nexrad_level2` | Geographic PNG for the briefing (local + S3) |
+| `plot_nexrad_level2` | Geographic PNG for the briefing (local; S3 when uploads enabled) |
 
 It complements MRMS: MRMS is broad and pre-processed; Level II is site-specific and rich in polarimetric detail.
 
@@ -21,7 +21,7 @@ It complements MRMS: MRMS is broad and pre-processed; Level II is site-specific 
 | Beam height and strong-echo (≥ 50 dBZ) dual-pol clues | `analyze_nexrad_level2` |
 | A map image the user can see in the briefing | `plot_nexrad_level2` |
 
-Only **`analyze_nexrad_level2`** is captured into agent state (`nexrad`) and passed into deterministic diagnosis. `plot_nexrad_level2` returns `image_path`, `s3_uri`, and `markdown_image_url`; the briefing runner embeds the public HTTPS URL, not the local path, for precip fusion.
+Only **`analyze_nexrad_level2`** is captured into agent state (`nexrad`) and passed into deterministic diagnosis. `plot_nexrad_level2` returns `image_path`, `s3_uri`, and `markdown_image_url`; the briefing runner embeds `markdown_image_url` (HTTPS after upload, otherwise the local path).
 
 ---
 
@@ -109,7 +109,7 @@ Validated by `NexradPlotInput`. Saves a PNG to `RADAR_PLOT_DIR` (default `radar_
 | `field` | `reflectivity` | Also velocity, differential_reflectivity, etc. |
 | `sweep` | 0 | Lowest tilt |
 
-Returns `image_path`, `s3_uri`, `markdown_image_url`, radar metadata, and scan info. PNGs are saved to `RADAR_PLOT_DIR` (default `radar_plots/`) and uploaded to `s3://<bucket>/radar/<YYYY-MM-DD>/<HH>_<MM>.png`. The system prompt asks the model to embed `markdown_image_url` as a sized HTML `<img>` tag in the Current Weather section.
+Returns `image_path`, `s3_uri`, `markdown_image_url`, radar metadata, and scan info. PNGs are saved to `RADAR_PLOT_DIR` (default `radar_plots/`) and, when `storage.upload_to_s3` is enabled, uploaded to `s3://<bucket>/radar/<YYYY-MM-DD>/<HH>_<MM>.png`. `markdown_image_url` is the public HTTPS URL after a successful upload, otherwise the absolute local path. The system prompt asks the model to embed `markdown_image_url` as a sized HTML `<img>` tag in the Current Weather section.
 
 ---
 

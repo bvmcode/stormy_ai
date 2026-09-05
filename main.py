@@ -3,7 +3,7 @@
 import argparse
 
 from stormy_ai.briefing import run_briefing
-from stormy_ai.config import get_settings
+from stormy_ai.config import get_settings, set_upload_to_s3
 
 
 def main() -> None:
@@ -17,7 +17,15 @@ def main() -> None:
         default=default_location,
         help=f"Place name for the briefing (default: {default_location})",
     )
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Write images, data, and markdown locally only; skip S3 uploads.",
+    )
     args = parser.parse_args()
+
+    if args.local:
+        set_upload_to_s3(False)
 
     result = run_briefing(args.location)
     print(result["briefing"])
@@ -26,6 +34,8 @@ def main() -> None:
         print(f"Uploaded {result['briefing_s3_uri']}")
         if result.get("briefing_latest_s3_uri"):
             print(f"Updated {result['briefing_latest_s3_uri']}")
+    elif args.local:
+        print("Skipped S3 upload (--local).")
     elif result.get("briefing_s3_upload_error"):
         print(f"S3 upload failed: {result['briefing_s3_upload_error']}")
 

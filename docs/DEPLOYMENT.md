@@ -15,9 +15,10 @@ Default entrypoint:
 
 ```bash
 python main.py [location]
+python main.py --local [location]
 ```
 
-When no location argument is passed, `config.yaml` `briefing.default_location` is used (`Atco, NJ 08004` by default).
+When no location argument is passed, `config.yaml` `briefing.default_location` is used (`Atco, NJ 08004` by default). `--local` sets `storage.upload_to_s3` to false for that run so briefings and plot images stay on disk only.
 
 ### Makefile targets
 
@@ -131,7 +132,7 @@ aws logs tail /ecs/wx-briefing-agent --follow --region us-east-1
 
 ## S3 outputs
 
-Successful runs upload:
+When `storage.upload_to_s3` is enabled (default for ECS and normal CLI runs), successful runs upload:
 
 - Briefing markdown → `s3://stormy-ai-files/briefings/<date>/<zip>/<time>.md`
 - Latest pointer → `s3://stormy-ai-files/latest.txt` (single-line `s3://` URI of the newest briefing; override key with `BRIEFING_LATEST_S3_KEY`)
@@ -140,6 +141,8 @@ Successful runs upload:
 - Forecast-zone maps → `s3://stormy-ai-files/forecast_zones/<zone>.png` (cached per zone id; plotted once, reused on later briefings)
 
 Public embed URLs use `https://<bucket>.s3.amazonaws.com/<key>` unless `STORMY_S3_PUBLIC_BASE` is set (for CloudFront or custom domains). The bucket policy must grant `s3:GetObject` on these prefixes (`models/*`, `radar/*`, `briefings/*`, `forecast_zones/*`). Without `forecast_zones/*` in the public policy, zone maps return HTTP 403 and will not render in markdown.
+
+Disable uploads with `python main.py --local`, `storage.upload_to_s3: false` in `config.yaml`, or `STORMY_UPLOAD_TO_S3=false`. Local-only runs still write under `briefings/`, `radar_plots/`, `model_plots/`, and `forecast_zones/`.
 
 ---
 
@@ -150,7 +153,8 @@ Public embed URLs use `https://<bucket>.s3.amazonaws.com/<key>` unless `STORMY_S
 | LLM | Ollama or HF (your choice in `config.yaml`) | HF via `HF_TOKEN` secret (typical) |
 | AWS creds | `aws configure` or env vars | Task IAM role |
 | Image arch | Host Python or `make local_run` (arm64) | ARM64 Fargate |
-| Schedule | Manual (`python main.py`) | EventBridge Scheduler — 4× daily US Eastern |
+| Schedule | Manual (`python main.py` or `python main.py --local`) | EventBridge Scheduler — 4× daily US Eastern |
 | Config | `config.yaml` + `.env` | Baked into image; override via env if needed |
+| S3 uploads | Optional (`--local` / `upload_to_s3: false`) | Enabled (task IAM role) |
 
-For local development with Ollama, run `python main.py` directly — no Docker or ECS required. S3 uploads still need valid AWS credentials when enabled.
+For local development with Ollama, run `python main.py` or `python main.py --local` directly — no Docker or ECS required. S3 uploads need valid AWS credentials only when enabled.

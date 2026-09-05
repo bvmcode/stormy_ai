@@ -27,6 +27,7 @@ briefing:
 paths:
   radar_plot_dir: radar_plots
   gfs_model_plot_dir: model_plots
+  forecast_zone_plot_dir: forecast_zones
 
 storage:
   s3_bucket: stormy-ai-files
@@ -35,3 +36,5 @@ storage:
   radar_prefix: radar
   gfs_prefix: models/gfs
   public_base_url: ""
+  # Set false (or pass --local to main.py) to keep briefings and plots local only.
+  upload_to_s3: true
