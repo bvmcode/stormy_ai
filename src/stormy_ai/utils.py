@@ -270,7 +270,15 @@ def format_briefing_image(alt_text: str, image_url: str, *, width: int | None = 
     if not url:
         raise ValueError("An image URL is required for briefing embeds.")
 
-    image_width = width if width is not None else get_settings().briefing.image_width
+    if width is not None:
+        image_width = width
+    else:
+        default_width = get_settings().briefing.image_width
+        # Forecast-zone locator maps are intentionally smaller than radar/GFS.
+        if "/forecast_zones/" in url:
+            image_width = min(480, default_width)
+        else:
+            image_width = default_width
     safe_alt = (
         alt_text.replace("&", "&amp;")
         .replace('"', "&quot;")

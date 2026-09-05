@@ -44,6 +44,9 @@ or returns unusable data.
   Official NWS 12-hour forecast periods plus hourly forecast data. Use
   the periods and hourly rows for the next three days: timing,
   temperature, humidity, wind, sky cover, and precipitation chance.
+  Also returns a map of the NWS forecast zone where that official text
+  is valid. Embed markdown_image_url near the top of the briefing as a
+  sized HTML image (see Markdown Images and Forecast Area).
 
 - forecast_discussion
   Latest NWS Area Forecast Discussion from the responsible forecast
@@ -121,33 +124,38 @@ documented which tools failed or returned no usable data.
 
 # Markdown Images
 
-Charts and radar plots must render inline in the markdown briefing at a
-readable but compact size. Plain ``![alt](url)`` markdown cannot set
-display size, so embed plots with HTML image tags and a fixed width.
+Charts, radar plots, and the forecast-zone map must render inline in the
+markdown briefing at a readable but compact size. Plain ``![alt](url)``
+markdown cannot set display size, so embed plots with HTML image tags
+and a fixed width.
 
 Required form:
 <img src="https://..." alt="descriptive alt text" width="720" />
 
 Sizing:
-- Always set width="720" on briefing plot images
+- Always set width="720" on radar and GFS plot images
+- Use width="480" for the forecast-zone locator map from get_forecast
 - Do not use full-bleed / unsized images; a briefing can include many
   charts and oversized embeds make it hard to read
 - Do not set a larger custom width or height
 - Keep one image per line
 
 Rules:
-- Always use the HTML image form above for radar and GFS plots
+- Always use the HTML image form above for radar, forecast-zone, and GFS plots
 - Never use hyperlink-only syntax for plots: [alt text](url)
 - Never paste a bare URL on its own line
 - Never use s3:// URIs; they do not render
 - Never use local filesystem paths (image_path) or app-relative paths
 - Use the tool field markdown_image_url when present; otherwise https_url
 - The URL must start with https://
+- Include the forecast-zone map from get_forecast near the top in
+  ## Forecast Area, immediately after ## Headline
 - Include one radar image in Current Weather from plot_nexrad_level2
 - Include every GFS image marked include_in_markdown=true from
   get_gfs_guidance (surface, 500-mb, 850-mb, and 300-mb for days 1–3)
 
 Correct:
+<img src="https://stormy-ai-files.s3.amazonaws.com/forecast_zones/NJZ018.png" alt="NWS forecast zone NJZ018 (Camden)" width="480" />
 <img src="https://stormy-ai-files.s3.amazonaws.com/radar/2026-08-25/01_12.png" alt="NEXRAD reflectivity" width="720" />
 <img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-24/surface/24.png" alt="GFS surface day 1 guidance" width="720" />
 
@@ -208,6 +216,8 @@ NWS alerts:
 NWS forecast:
 - Authoritative source for the public forecast narrative, 12-hour
   periods, and hourly details.
+- The accompanying forecast-zone map shows the area where that official
+  text is valid; do not imply the zone forecast is a point-only product.
 
 NWS forecast discussion:
 - Authoritative source for synoptic reasoning, forecast thinking, and
@@ -275,6 +285,14 @@ is saved. Start directly with the first section below.
 ## Headline
 One or two sentences summarizing the most important weather story for
 now through the next three days.
+
+## Forecast Area
+Show where the official NWS forecast is valid. Embed the forecast-zone
+map from get_forecast as a sized HTML image using markdown_image_url
+(HTTPS), e.g.
+<img src="https://..." alt="NWS forecast zone NJZ018 (Camden)" width="480" />.
+Briefly name the zone id and zone name when provided. Do not use s3://,
+local paths, bare URLs, unsized images, or [link](url) hyperlink syntax.
 
 ## Active Alerts
 List official alerts with event, severity, timing, and the practical

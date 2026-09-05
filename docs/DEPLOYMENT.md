@@ -115,6 +115,7 @@ To pass a location, set `default_location` in `infra/variables.tf` (or via `-var
 | `AWS_DEFAULT_REGION` / `AWS_REGION` | Task env | S3 client region |
 | `BRIEFING_S3_BUCKET` | Task env | Briefing upload bucket |
 | `RADAR_S3_BUCKET` / `GFS_S3_BUCKET` | Task env | Plot upload buckets |
+| `FORECAST_ZONE_S3_BUCKET` / `FORECAST_ZONE_S3_PREFIX` | Optional | Cached forecast-zone map bucket/prefix (defaults to briefing bucket + `forecast_zones`) |
 | `MALLOC_ARENA_MAX` | Task env | Limit glibc arenas (memory) |
 | `OMP_NUM_THREADS` / `OPENBLAS_NUM_THREADS` | Task env | Cap BLAS threads (8) |
 
@@ -136,8 +137,9 @@ Successful runs upload:
 - Latest pointer → `s3://stormy-ai-files/latest.txt` (single-line `s3://` URI of the newest briefing; override key with `BRIEFING_LATEST_S3_KEY`)
 - Radar PNG → `s3://stormy-ai-files/radar/<date>/<time>.png`
 - GFS charts → `s3://stormy-ai-files/models/gfs/<date>/<type>/<hour>.png`
+- Forecast-zone maps → `s3://stormy-ai-files/forecast_zones/<zone>.png` (cached per zone id; plotted once, reused on later briefings)
 
-Public embed URLs use `https://<bucket>.s3.amazonaws.com/<key>` unless `STORMY_S3_PUBLIC_BASE` is set (for CloudFront or custom domains). The bucket policy must grant `s3:GetObject` on these prefixes.
+Public embed URLs use `https://<bucket>.s3.amazonaws.com/<key>` unless `STORMY_S3_PUBLIC_BASE` is set (for CloudFront or custom domains). The bucket policy must grant `s3:GetObject` on these prefixes (`models/*`, `radar/*`, `briefings/*`, `forecast_zones/*`). Without `forecast_zones/*` in the public policy, zone maps return HTTP 403 and will not render in markdown.
 
 ---
 

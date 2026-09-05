@@ -1,0 +1,139 @@
+12-hour forecast periods (today through the next two days):
+
+Today:
+Time: 2026-09-05T06:00:00-04:00 to 2026-09-05T18:00:00-04:00
+Temperature: 83°F
+Wind: 5 mph N
+Chance of precipitation: 8%
+Short forecast: Partly Sunny
+Forecast: Partly sunny, with a high near 83. North wind around 5 mph. New rainfall amounts less than a tenth of an inch possible.
+
+Tonight:
+Time: 2026-09-05T18:00:00-04:00 to 2026-09-06T06:00:00-04:00
+Temperature: 61°F
+Wind: 0 to 5 mph N
+Chance of precipitation: 0%
+Short forecast: Mostly Clear
+Forecast: Mostly clear, with a low around 61. North wind 0 to 5 mph.
+
+Sunday:
+Time: 2026-09-06T06:00:00-04:00 to 2026-09-06T18:00:00-04:00
+Temperature: 79°F
+Wind: 5 mph NE
+Chance of precipitation: 19%
+Short forecast: Mostly Sunny then Slight Chance Rain Showers
+Forecast: A slight chance of rain showers between 1pm and 4pm. Mostly sunny, with a high near 79. Northeast wind around 5 mph. Chance of precipitation is 20%.
+
+Sunday Night:
+Time: 2026-09-06T18:00:00-04:00 to 2026-09-07T06:00:00-04:00
+Temperature: 58°F
+Wind: 0 to 5 mph E
+Chance of precipitation: 4%
+Short forecast: Partly Cloudy
+Forecast: Partly cloudy, with a low around 58. East wind 0 to 5 mph.
+
+Labor Day:
+Time: 2026-09-07T06:00:00-04:00 to 2026-09-07T18:00:00-04:00
+Temperature: 80°F
+Wind: 0 to 5 mph N
+Chance of precipitation: 0%
+Short forecast: Sunny
+Forecast: Sunny, with a high near 80. North wind 0 to 5 mph.
+
+Monday Night:
+Time: 2026-09-07T18:00:00-04:00 to 2026-09-08T06:00:00-04:00
+Temperature: 57°F
+Wind: 0 mph 
+Chance of precipitation: 0%
+Short forecast: Mostly Clear
+Forecast: Mostly clear, with a low around 57.
+
+Tuesday:
+Time: 2026-09-08T06:00:00-04:00 to 2026-09-08T18:00:00-04:00
+Temperature: 83°F
+Wind: 0 to 5 mph W
+Chance of precipitation: 1%
+Short forecast: Mostly Sunny
+Forecast: Mostly sunny, with a high near 83.
+
+Tuesday Night:
+Time: 2026-09-08T18:00:00-04:00 to 2026-09-09T06:00:00-04:00
+Temperature: 61°F
+Wind: 0 to 5 mph SW
+Chance of precipitation: 1%
+Short forecast: Partly Cloudy
+Forecast: Partly cloudy, with a low around 61.
+
+Hourly forecast (next 72 hours):
+2026-09-05 09:00 -04:00 | 72°F | Dewpoint 63°F (17.2°C) | RH 73% | Wind 5 mph N | PoP 2% | Mostly Cloudy
+2026-09-05 10:00 -04:00 | 74°F | Dewpoint 63°F (17.2°C) | RH 69% | Wind 5 mph N | PoP 0% | Mostly Cloudy
+2026-09-05 11:00 -04:00 | 75°F | Dewpoint 63°F (17.2°C) | RH 66% | Wind 5 mph N | PoP 0% | Mostly Cloudy
+2026-09-05 12:00 -04:00 | 78°F | Dewpoint 62°F (16.7°C) | RH 58% | Wind 5 mph N | PoP 0% | Mostly Cloudy
+2026-09-05 13:00 -04:00 | 80°F | Dewpoint 62°F (16.7°C) | RH 54% | Wind 5 mph N | PoP 1% | Partly Sunny
+2026-09-05 14:00 -04:00 | 80°F | Dewpoint 62°F (16.7°C) | RH 54% | Wind 5 mph N | PoP 0% | Mostly Sunny
+2026-09-05 15:00 -04:00 | 82°F | Dewpoint 61°F (16.1°C) | RH 49% | Wind 5 mph N | PoP 0% | Mostly Sunny
+2026-09-05 16:00 -04:00 | 80°F | Dewpoint 61°F (16.1°C) | RH 52% | Wind 5 mph N | PoP 0% | Mostly Sunny
+2026-09-05 17:00 -04:00 | 80°F | Dewpoint 61°F (16.1°C) | RH 52% | Wind 5 mph NW | PoP 0% | Mostly Sunny
+2026-09-05 18:00 -04:00 | 79°F | Dewpoint 62°F (16.7°C) | RH 56% | Wind 5 mph N | PoP 0% | Partly Cloudy
+2026-09-05 19:00 -04:00 | 76°F | Dewpoint 62°F (16.7°C) | RH 62% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-05 20:00 -04:00 | 73°F | Dewpoint 62°F (16.7°C) | RH 68% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-05 21:00 -04:00 | 71°F | Dewpoint 63°F (17.2°C) | RH 76% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-05 22:00 -04:00 | 69°F | Dewpoint 62°F (16.7°C) | RH 78% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-05 23:00 -04:00 | 68°F | Dewpoint 62°F (16.7°C) | RH 81% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-06 00:00 -04:00 | 66°F | Dewpoint 62°F (16.7°C) | RH 87% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-06 01:00 -04:00 | 65°F | Dewpoint 62°F (16.7°C) | RH 90% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-06 02:00 -04:00 | 64°F | Dewpoint 61°F (16.1°C) | RH 90% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-06 03:00 -04:00 | 63°F | Dewpoint 61°F (16.1°C) | RH 93% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-06 04:00 -04:00 | 63°F | Dewpoint 61°F (16.1°C) | RH 93% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-06 05:00 -04:00 | 63°F | Dewpoint 61°F (16.1°C) | RH 93% | Wind 5 mph N | PoP 0% | Partly Cloudy
+2026-09-06 06:00 -04:00 | 62°F | Dewpoint 61°F (16.1°C) | RH 97% | Wind 5 mph N | PoP 2% | Mostly Sunny
+2026-09-06 07:00 -04:00 | 61°F | Dewpoint 61°F (16.1°C) | RH 100% | Wind 5 mph NE | PoP 5% | Mostly Sunny
+2026-09-06 08:00 -04:00 | 65°F | Dewpoint 63°F (17.2°C) | RH 93% | Wind 5 mph NE | PoP 7% | Mostly Sunny
+2026-09-06 09:00 -04:00 | 67°F | Dewpoint 63°F (17.2°C) | RH 87% | Wind 5 mph NE | PoP 9% | Mostly Sunny
+2026-09-06 10:00 -04:00 | 71°F | Dewpoint 63°F (17.2°C) | RH 76% | Wind 5 mph NE | PoP 11% | Mostly Sunny
+2026-09-06 11:00 -04:00 | 73°F | Dewpoint 63°F (17.2°C) | RH 71% | Wind 5 mph NE | PoP 13% | Mostly Sunny
+2026-09-06 12:00 -04:00 | 75°F | Dewpoint 62°F (16.7°C) | RH 64% | Wind 5 mph NE | PoP 12% | Mostly Sunny
+2026-09-06 13:00 -04:00 | 76°F | Dewpoint 62°F (16.7°C) | RH 62% | Wind 5 mph NE | PoP 16% | Slight Chance Rain Showers
+2026-09-06 14:00 -04:00 | 76°F | Dewpoint 62°F (16.7°C) | RH 62% | Wind 5 mph NE | PoP 19% | Slight Chance Rain Showers
+2026-09-06 15:00 -04:00 | 77°F | Dewpoint 62°F (16.7°C) | RH 60% | Wind 5 mph NE | PoP 17% | Slight Chance Rain Showers
+2026-09-06 16:00 -04:00 | 74°F | Dewpoint 62°F (16.7°C) | RH 66% | Wind 5 mph NE | PoP 7% | Mostly Sunny
+2026-09-06 17:00 -04:00 | 74°F | Dewpoint 61°F (16.1°C) | RH 64% | Wind 5 mph E | PoP 0% | Mostly Sunny
+2026-09-06 18:00 -04:00 | 73°F | Dewpoint 62°F (16.7°C) | RH 68% | Wind 5 mph E | PoP 2% | Partly Cloudy
+2026-09-06 19:00 -04:00 | 70°F | Dewpoint 61°F (16.1°C) | RH 73% | Wind 0 mph | PoP 4% | Partly Cloudy
+2026-09-06 20:00 -04:00 | 68°F | Dewpoint 62°F (16.7°C) | RH 81% | Wind 0 mph | PoP 3% | Partly Cloudy
+2026-09-06 21:00 -04:00 | 65°F | Dewpoint 62°F (16.7°C) | RH 90% | Wind 0 mph | PoP 3% | Partly Cloudy
+2026-09-06 22:00 -04:00 | 64°F | Dewpoint 62°F (16.7°C) | RH 93% | Wind 0 mph | PoP 3% | Partly Cloudy
+2026-09-06 23:00 -04:00 | 63°F | Dewpoint 62°F (16.7°C) | RH 97% | Wind 0 mph | PoP 3% | Mostly Clear
+2026-09-07 00:00 -04:00 | 62°F | Dewpoint 61°F (16.1°C) | RH 97% | Wind 0 mph | PoP 3% | Mostly Clear
+2026-09-07 01:00 -04:00 | 61°F | Dewpoint 61°F (16.1°C) | RH 100% | Wind 0 mph | PoP 3% | Partly Cloudy
+2026-09-07 02:00 -04:00 | 60°F | Dewpoint 60°F (15.6°C) | RH 100% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-07 03:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-07 04:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-07 05:00 -04:00 | 58°F | Dewpoint 58°F (14.4°C) | RH 100% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-07 06:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Mostly Sunny
+2026-09-07 07:00 -04:00 | 60°F | Dewpoint 59°F (15.0°C) | RH 96% | Wind 0 mph | PoP 0% | Mostly Sunny
+2026-09-07 08:00 -04:00 | 62°F | Dewpoint 60°F (15.6°C) | RH 93% | Wind 0 mph | PoP 0% | Sunny
+2026-09-07 09:00 -04:00 | 66°F | Dewpoint 59°F (15.0°C) | RH 78% | Wind 0 mph | PoP 0% | Sunny
+2026-09-07 10:00 -04:00 | 69°F | Dewpoint 59°F (15.0°C) | RH 70% | Wind 5 mph N | PoP 0% | Sunny
+2026-09-07 11:00 -04:00 | 73°F | Dewpoint 59°F (15.0°C) | RH 62% | Wind 5 mph N | PoP 0% | Sunny
+2026-09-07 12:00 -04:00 | 75°F | Dewpoint 58°F (14.4°C) | RH 56% | Wind 5 mph N | PoP 0% | Sunny
+2026-09-07 13:00 -04:00 | 77°F | Dewpoint 57°F (13.9°C) | RH 50% | Wind 5 mph N | PoP 0% | Sunny
+2026-09-07 14:00 -04:00 | 78°F | Dewpoint 56°F (13.3°C) | RH 47% | Wind 5 mph N | PoP 0% | Sunny
+2026-09-07 15:00 -04:00 | 78°F | Dewpoint 55°F (12.8°C) | RH 45% | Wind 5 mph NW | PoP 0% | Sunny
+2026-09-07 16:00 -04:00 | 78°F | Dewpoint 55°F (12.8°C) | RH 45% | Wind 0 mph | PoP 0% | Sunny
+2026-09-07 17:00 -04:00 | 77°F | Dewpoint 56°F (13.3°C) | RH 48% | Wind 0 mph | PoP 0% | Sunny
+2026-09-07 18:00 -04:00 | 75°F | Dewpoint 56°F (13.3°C) | RH 52% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-07 19:00 -04:00 | 72°F | Dewpoint 57°F (13.9°C) | RH 59% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-07 20:00 -04:00 | 69°F | Dewpoint 58°F (14.4°C) | RH 68% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-07 21:00 -04:00 | 67°F | Dewpoint 58°F (14.4°C) | RH 73% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-07 22:00 -04:00 | 65°F | Dewpoint 58°F (14.4°C) | RH 78% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-07 23:00 -04:00 | 63°F | Dewpoint 59°F (15.0°C) | RH 87% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-08 00:00 -04:00 | 62°F | Dewpoint 59°F (15.0°C) | RH 90% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-08 01:00 -04:00 | 61°F | Dewpoint 59°F (15.0°C) | RH 93% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-08 02:00 -04:00 | 60°F | Dewpoint 59°F (15.0°C) | RH 96% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-08 03:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-08 04:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Mostly Clear
+2026-09-08 05:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Partly Cloudy
+2026-09-08 06:00 -04:00 | 59°F | Dewpoint 59°F (15.0°C) | RH 100% | Wind 0 mph | PoP 0% | Sunny
+2026-09-08 07:00 -04:00 | 61°F | Dewpoint 59°F (15.0°C) | RH 93% | Wind 0 mph | PoP 0% | Sunny
+2026-09-08 08:00 -04:00 | 63°F | Dewpoint 59°F (15.0°C) | RH 87% | Wind 0 mph | PoP 0% | Sunny

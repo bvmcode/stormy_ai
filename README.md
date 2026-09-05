@@ -9,6 +9,7 @@ Stormy AI is a LangGraph weather-briefing agent. You give it a place name; it ge
 Each run produces a structured **weather briefing** with:
 
 - Headline and bottom line
+- Forecast area (NWS forecast-zone locator map)
 - Active NWS alerts
 - Current weather (surface obs + radar/precip/lightning + diagnosis)
 - Current synoptic setup (Area Forecast Discussion plus latest-cycle GFS)
@@ -17,7 +18,7 @@ Each run produces a structured **weather briefing** with:
 - Outlook from the forecast discussion
 - Day-by-day forecast for the next three days
 
-Briefings are written locally under `briefings/` and uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the four-times-daily schedule (midnight, 6am, noon, 6pm US Eastern). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2` and GFS chart PNGs from `get_gfs_guidance` are saved locally (`radar_plots/`, `model_plots/`) and uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs.
+Briefings are written locally under `briefings/` and uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the four-times-daily schedule (midnight, 6am, noon, 6pm US Eastern). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs.
 
 ---
 
@@ -29,7 +30,7 @@ User (CLI or ECS task)
         → LangGraph: reset → agent ⇄ tools → collect_weather → agent
             → LLM + 12 weather tools
             → diagnose_precipitation when MRMS + HRRR are ready
-        → markdown briefing (+ radar/GFS images via HTTPS)
+        → markdown briefing (+ forecast-zone / radar / GFS images via HTTPS)
         → local file + S3 upload (+ latest.txt pointer)
 ```
 
@@ -50,7 +51,7 @@ Deep dive: [`docs/AGENT.md`](docs/AGENT.md). Per-tool docs: [`docs/tools/`](docs
   - **[Ollama](https://ollama.com/)** running locally with a chat model (e.g. `gemma4:latest`), or
   - **Hugging Face Inference Providers** with `HF_TOKEN` set (see [Configuration](#configuration))
 - System libraries for GRIB/NetCDF and cartography as needed by `cfgrib` / `eccodes` / Cartopy / Py-ART on your OS
-- **AWS credentials** (optional locally) — required for S3 uploads of briefings, radar plots, and GFS charts
+- **AWS credentials** (optional locally) — required for S3 uploads of briefings, radar plots, GFS charts, and forecast-zone maps
 
 ---
 
@@ -76,7 +77,7 @@ python main.py                     # default: Atco, NJ 08004
 python main.py "Denver, CO"
 ```
 
-The CLI prints the briefing, writes a timestamped file under `briefings/`, and uploads it to S3 when credentials are available. On success it also updates `s3://<bucket>/latest.txt` with the new briefing URI. Radar and GFS images are embedded as sized HTML `<img>` tags pointing at public HTTPS object URLs.
+The CLI prints the briefing, writes a timestamped file under `briefings/`, and uploads it to S3 when credentials are available. On success it also updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags pointing at public HTTPS object URLs (zone maps use `width="480"`; radar/GFS use `720`).
 
 ---
 
@@ -161,7 +162,7 @@ Environment variables override `config.yaml` when set:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `BRIEFING_DIR` | `briefings` | Local markdown output directory |
-| `BRIEFING_IMAGE_WIDTH` | `720` | Width (px) for embedded `<img>` tags |
+| `BRIEFING_IMAGE_WIDTH` | `720` | Default width (px) for embedded `<img>` tags (forecast-zone maps use `480`) |
 | `RADAR_PLOT_DIR` | `radar_plots` | Local NEXRAD PNG directory |
 | `GFS_MODEL_PLOT_DIR` | `model_plots` | Local GFS chart PNG directory |
 | `BRIEFING_S3_BUCKET` | `stormy-ai-files` | S3 bucket for briefing uploads |
@@ -171,6 +172,8 @@ Environment variables override `config.yaml` when set:
 | `RADAR_S3_PREFIX` | `radar` | Key prefix for radar PNGs |
 | `GFS_S3_BUCKET` | `stormy-ai-files` | S3 bucket for GFS chart uploads |
 | `GFS_S3_PREFIX` | `models/gfs` | Key prefix for GFS chart uploads |
+| `FORECAST_ZONE_S3_BUCKET` | same as briefing bucket | S3 bucket for cached forecast-zone PNGs |
+| `FORECAST_ZONE_S3_PREFIX` | `forecast_zones` | Key prefix (`<prefix>/<ZONE_ID>.png`) |
 | `STORMY_S3_PUBLIC_BASE` | *(empty)* | Override HTTPS base for embed URLs (e.g. CloudFront) |
 
 S3 object layout:
@@ -180,7 +183,10 @@ s3://stormy-ai-files/briefings/<YYYY-MM-DD>/<zip_code>/<HH_MM>.md
 s3://stormy-ai-files/latest.txt                              ← s3:// URI of newest briefing
 s3://stormy-ai-files/radar/<YYYY-MM-DD>/<HH>_<MM>.png
 s3://stormy-ai-files/models/gfs/<YYYY-MM-DD>/<image_type>/<forecast_hour>.png
+s3://stormy-ai-files/forecast_zones/<ZONE_ID>.png            ← cached; reused across briefings
 ```
+
+Public embeds require a bucket policy that allows `s3:GetObject` on `briefings/*`, `radar/*`, `models/*`, and `forecast_zones/*`.
 
 No API keys are required for NWS, Open-Meteo geocoding, MRMS, HRRR (via Herbie), NEXRAD, or GLM open data. The NWS client sends a fixed User-Agent.
 
@@ -204,7 +210,7 @@ uv run python -m unittest discover -s tests -v
 | `geocode_location` | Place name → lat/lon for every other tool |
 | `current_conditions` | Official nearest METAR/ASOS observation |
 | `get_alerts` | Authoritative watches / warnings / advisories |
-| `get_forecast` | Official 12-hour periods + hourly rows (~3 days) |
+| `get_forecast` | Official 12-hour periods + hourly rows (~3 days) + cached forecast-zone map |
 | `forecast_discussion` | WFO reasoning for synoptic setup and outlook |
 | `get_mrms_precipitation` | Current precip rate and nearby echoes (CONUS) |
 | `get_hrrr_environment` | Model thermo, precip-type flags, CAPE/CIN |
@@ -258,7 +264,7 @@ stormy_ai/
 | [`docs/AGENT.md`](docs/AGENT.md) | LangGraph graph, state, tool loop, diagnosis injection |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Docker image, ECR, Terraform, ECS Fargate, scheduled runs |
 | [`docs/tools/GEOCODE.md`](docs/tools/GEOCODE.md) | Open-Meteo place → lat/lon |
-| [`docs/tools/NWS.md`](docs/tools/NWS.md) | Forecast, alerts, obs, AFD |
+| [`docs/tools/NWS.md`](docs/tools/NWS.md) | Forecast, zone maps, alerts, obs, AFD |
 | [`docs/tools/MRMS.md`](docs/tools/MRMS.md) | Current precip / reflectivity mosaic |
 | [`docs/tools/HRRR.md`](docs/tools/HRRR.md) | Model environment and precip-type guidance |
 | [`docs/tools/GFS.md`](docs/tools/GFS.md) | GFS point guidance and regional charts |

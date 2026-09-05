@@ -53,6 +53,8 @@ def build_briefing_request(location: str) -> str:
         "Embed radar and GFS charts as sized HTML images using each tool's "
         "markdown_image_url, for example "
         f'<img src="https://..." alt="..." width="{image_width}" />; '
+        "also embed get_forecast's forecast-zone map near the top using its "
+        "markdown_image_url. "
         "do not use s3:// links, bare URLs, unsized full-bleed images, or "
         "[text](url) hyperlinks for plots."
     )
@@ -116,6 +118,46 @@ def extract_radar_plot_info(messages) -> dict:
     }
 
 
+def extract_forecast_zone_info(messages) -> dict:
+    """Return forecast-zone map URL metadata from the latest get_forecast result."""
+
+    zone_image_url = None
+    zone_s3_uri = None
+    zone_id = None
+    zone_name = None
+
+    for message in messages:
+        if not isinstance(message, ToolMessage):
+            continue
+        if message.name != "get_forecast":
+            continue
+
+        result = parse_tool_content(message.content)
+        if not result:
+            continue
+
+        forecast_zone = result.get("forecast_zone") or {}
+        zone_id = forecast_zone.get("id") or zone_id
+        zone_name = forecast_zone.get("name") or zone_name
+
+        if result.get("s3_uri"):
+            zone_s3_uri = result["s3_uri"]
+
+        if result.get("markdown_image_url"):
+            zone_image_url = result["markdown_image_url"]
+        elif result.get("https_url"):
+            zone_image_url = result["https_url"]
+        elif result.get("s3_uri"):
+            zone_image_url = s3_uri_to_https_url(result["s3_uri"])
+
+    return {
+        "forecast_zone_image_url": zone_image_url,
+        "forecast_zone_s3_uri": zone_s3_uri,
+        "forecast_zone_id": zone_id,
+        "forecast_zone_name": zone_name,
+    }
+
+
 def extract_radar_plot_path(messages) -> Path | None:
     """Return the latest radar plot path from tool messages, if any."""
 
@@ -135,6 +177,54 @@ def extract_gfs_guidance(messages) -> dict | None:
         if parsed:
             result = parsed
     return result
+
+
+def ensure_forecast_zone_markdown(
+    briefing_text: str,
+    image_url: str | None,
+    *,
+    zone_id: str | None = None,
+    zone_name: str | None = None,
+) -> str:
+    """Ensure the briefing embeds the forecast-zone map near the top."""
+
+    text = normalize_briefing_images(briefing_text.strip())
+    image_url = public_image_url(image_url)
+    if not image_url:
+        return text
+
+    if zone_id and zone_name:
+        alt_text = f"NWS forecast zone {zone_id} ({zone_name})"
+    elif zone_id:
+        alt_text = f"NWS forecast zone {zone_id}"
+    else:
+        alt_text = "NWS forecast zone"
+
+    image_line = format_briefing_image(alt_text, image_url, width=480)
+    if image_url in text:
+        return text
+
+    text = re.sub(
+        rf"(?m)^\s*{re.escape(image_url)}\s*$",
+        image_line,
+        text,
+        count=1,
+    )
+    if image_line in text or image_url in text:
+        return text
+
+    block = (
+        "## Forecast Area\n\n"
+        "Official NWS forecast text applies to the shaded forecast zone below.\n\n"
+        f"{image_line}\n"
+    )
+
+    headline = re.search(r"(## Headline\s*\n.*?)(?=\n## |\Z)", text, re.DOTALL)
+    if headline:
+        insert_at = headline.end()
+        return text[:insert_at].rstrip() + "\n\n" + block + "\n" + text[insert_at:].lstrip()
+
+    return block + "\n" + text
 
 
 def ensure_radar_image_markdown(
@@ -356,6 +446,9 @@ def write_briefing_markdown(
     gfs_guidance: dict | None = None,
     *,
     radar_s3_uri: str | None = None,
+    forecast_zone_image_url: str | None = None,
+    forecast_zone_id: str | None = None,
+    forecast_zone_name: str | None = None,
 ) -> dict:
     """
     Write a timestamped markdown briefing locally and upload it to S3.
@@ -370,6 +463,12 @@ def write_briefing_markdown(
     path = briefing_dir / f"{stamp}_{slugify(location)}.md"
 
     body = strip_llm_briefing_preamble(briefing_text)
+    body = ensure_forecast_zone_markdown(
+        body,
+        forecast_zone_image_url,
+        zone_id=forecast_zone_id,
+        zone_name=forecast_zone_name,
+    )
     body = ensure_radar_image_markdown(
         body,
         radar_image_url or radar_s3_uri,
@@ -429,9 +528,20 @@ def run_briefing(location: str | None = None) -> dict:
 
     messages = result["messages"]
     radar_info = extract_radar_plot_info(messages)
+    forecast_zone_info = extract_forecast_zone_info(messages)
     gfs_guidance = extract_gfs_guidance(messages)
     radar_image_url = radar_info["radar_image_url"] or radar_info["radar_s3_uri"]
+    forecast_zone_image_url = (
+        forecast_zone_info["forecast_zone_image_url"]
+        or forecast_zone_info["forecast_zone_s3_uri"]
+    )
     briefing_text = strip_llm_briefing_preamble(message_text(messages[-1].content))
+    briefing_text = ensure_forecast_zone_markdown(
+        briefing_text,
+        forecast_zone_image_url,
+        zone_id=forecast_zone_info["forecast_zone_id"],
+        zone_name=forecast_zone_info["forecast_zone_name"],
+    )
     briefing_text = ensure_radar_image_markdown(
         briefing_text,
         radar_image_url,
@@ -445,6 +555,9 @@ def run_briefing(location: str | None = None) -> dict:
         briefing_text,
         radar_image_url=radar_image_url,
         gfs_guidance=gfs_guidance,
+        forecast_zone_image_url=forecast_zone_image_url,
+        forecast_zone_id=forecast_zone_info["forecast_zone_id"],
+        forecast_zone_name=forecast_zone_info["forecast_zone_name"],
     )
 
     return {
@@ -458,5 +571,8 @@ def run_briefing(location: str | None = None) -> dict:
         "radar_plot_path": radar_info["radar_plot_path"],
         "radar_s3_uri": radar_info["radar_s3_uri"],
         "radar_image_url": radar_image_url,
+        "forecast_zone_image_url": forecast_zone_image_url,
+        "forecast_zone_s3_uri": forecast_zone_info["forecast_zone_s3_uri"],
+        "forecast_zone_id": forecast_zone_info["forecast_zone_id"],
         "gfs_guidance": gfs_guidance,
     }

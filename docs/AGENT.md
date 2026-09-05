@@ -175,7 +175,7 @@ Registered tools (order in `tools/__init__.py`):
 | Tool | Module | Role in briefings |
 |------|--------|-------------------|
 | `geocode_location` | `geocode.py` | Place → lat/lon |
-| `get_forecast` | `nws.py` | Official 12-hour + hourly forecast |
+| `get_forecast` | `nws.py` | Official 12-hour + hourly forecast; cached forecast-zone map |
 | `get_alerts` | `nws.py` | Active watches/warnings/advisories |
 | `current_conditions` | `nws.py` | Nearest METAR/ASOS observation |
 | `forecast_discussion` | `nws.py` | Area Forecast Discussion (AFD) |
@@ -209,12 +209,13 @@ On the next `agent` hop, `build_system_prompt` can inject that diagnosis.
 2. `graph.invoke({"messages": [("user", ...)]})`
 3. Take the final AI message as briefing text
 4. Post-process images:
+   - `ensure_forecast_zone_markdown` — embed the NWS forecast-zone locator map near the top (**Forecast Area**, after **Headline**) via `markdown_image_url` (public HTTPS, `width="480"`)
    - `ensure_radar_image_markdown` — embed radar via `markdown_image_url` (public HTTPS)
    - `ensure_gfs_guidance_markdown` — insert day 1–3 GFS charts if the model omitted them
    - `normalize_briefing_images` — convert markdown links and bare URLs to sized `<img>` tags
 5. `write_briefing_markdown` — prepend schedule metadata (**Updated** / **Next update** for the four-times-daily Eastern cadence), write `briefings/YYYY-MM-DD_HHMM_<slug>.md`, upload to S3, and update `latest.txt` at the bucket root
 
-There is a single briefing type: **weather** (`DEFAULT_BRIEFING_TYPE = "weather"`). Older “current vs daily” modes are gone; the prompt and runner always produce the same sectioned report (headline, alerts, current weather, synoptic setup, GFS guidance, HRRR analysis, outlook, 3-day forecast, bottom line).
+There is a single briefing type: **weather** (`DEFAULT_BRIEFING_TYPE = "weather"`). Older “current vs daily” modes are gone; the prompt and runner always produce the same sectioned report (headline, forecast area, alerts, current weather, synoptic setup, GFS guidance, HRRR analysis, outlook, 3-day forecast, bottom line).
 
 The system prompt’s recommended tool order:
 
@@ -255,7 +256,7 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 7. Once MRMS + HRRR exist, collect_weather sets diagnosis
 8. agent sees <weather_diagnosis> and writes markdown sections
 9. agent returns text with no tool_calls → graph END
-10. briefing markdown is post-processed (radar/GFS embeds), written locally, uploaded to S3, and `latest.txt` is updated with the new briefing URI
+10. briefing markdown is post-processed (forecast-zone / radar / GFS embeds), written locally, uploaded to S3, and `latest.txt` is updated with the new briefing URI
 ```
 
 ---
@@ -275,7 +276,7 @@ Tools answer narrow questions. Precipitation **type**, intensity labels, hail-li
 | Path | Role |
 |------|------|
 | `src/stormy_ai/agent.py` | Graph, state, collect/diagnose injection |
-| `src/stormy_ai/briefing.py` | `run_briefing`, schedule headers, markdown post-processing, S3 upload + `latest.txt` |
+| `src/stormy_ai/briefing.py` | `run_briefing`, schedule headers, markdown post-processing (forecast-zone / radar / GFS), S3 upload + `latest.txt` |
 | `src/stormy_ai/config.py` | `config.yaml` loader and env overrides |
 | `src/stormy_ai/llm.py` | Ollama / Hugging Face chat model factory |
 | `src/stormy_ai/utils.py` | S3 upload, `upload_s3_text`, `s3://` → HTTPS, tool-content parsing |

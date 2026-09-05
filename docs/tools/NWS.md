@@ -7,7 +7,7 @@ Module: `src/stormy_ai/tools/nws.py`
 | Tool | Role |
 |------|------|
 | `current_conditions` | Latest METAR/ASOS observation from the nearest station |
-| `get_forecast` | 12-hour periods plus hourly forecast for ~72 hours |
+| `get_forecast` | 12-hour periods + hourly forecast (~72 hours) plus a cached forecast-zone map |
 | `forecast_discussion` | Latest Area Forecast Discussion from the local WFO |
 | `get_alerts` | Active alerts intersecting a point |
 
@@ -21,6 +21,7 @@ These tools complement observational sources (MRMS, NEXRAD, GLM) and model guida
 |---------------|----------|
 | Official temperature, wind, sky, visibility | `current_conditions` |
 | Day-by-day / hourly public forecast | `get_forecast` |
+| Where that official forecast text applies | `get_forecast` forecast-zone map |
 | Synoptic reasoning and outlook language | `forecast_discussion` |
 | Whether a watch/warning/advisory is in effect | `get_alerts` |
 
@@ -32,14 +33,16 @@ The system prompt treats alerts and the public forecast as authoritative. The ag
 
 Free, unauthenticated REST API at `https://api.weather.gov`. Stormy AI uses:
 
-1. **Points** — lat/lon → forecast office, grid, and station URLs  
+1. **Points** — lat/lon → forecast office, grid, station URLs, and forecast zone  
    `GET /points/{lat},{lon}`
 2. **Forecast** — 12-hour periods (`properties.forecast`)
 3. **Hourly forecast** — hourly periods (`properties.forecastHourly`)
-4. **Observation stations** — nearby METAR/ASOS list
-5. **Latest observation** — `GET /stations/{stationId}/observations/latest`
-6. **Area Forecast Discussion** — `GET /products/types/AFD/locations/{cwa}/latest`
-7. **Alerts** — `GET /alerts/active?point={lat},{lon}`
+4. **Forecast zone geometry** — polygon where the public forecast is valid  
+   `GET /zones/forecast/{zoneId}` (e.g. `NJZ018`)
+5. **Observation stations** — nearby METAR/ASOS list
+6. **Latest observation** — `GET /stations/{stationId}/observations/latest`
+7. **Area Forecast Discussion** — `GET /products/types/AFD/locations/{cwa}/latest`
+8. **Alerts** — `GET /alerts/active?point={lat},{lon}`
 
 **Requirements**
 
@@ -68,6 +71,9 @@ NwsApi._get_points()  ←  HTTP GET with User-Agent
    │
    ├─► get_forecast()
    │      ~8 twelve-hour periods + ~72 hourly rows
+   │      forecastZone URL → ensure_forecast_zone_image()
+   │           ├─ if s3://…/forecast_zones/<zone>.png exists → reuse
+   │           └─ else fetch zone GeoJSON → plot → upload PNG
    │
    ├─► forecast_discussion()
    │      CWA → latest Area Forecast Discussion (AFD)
@@ -81,15 +87,53 @@ NwsApi._get_points()  ←  HTTP GET with User-Agent
 | Method | Behavior |
 |--------|----------|
 | `_get(url)` | Shared GET helper; returns parsed JSON or `None` on failure |
-| `_get_points(lat, lon)` | Looks up NWS grid, office, and related URLs |
+| `_get_points(lat, lon)` | Looks up NWS grid, office, forecast zone, and related URLs |
+| `ensure_forecast_zone_image(zone_url, lat, lon)` | Cached zone map PNG (see below) |
 | `current_conditions(lat, lon)` | Formats the nearest usable station’s latest observation |
-| `get_forecast(lat, lon)` | Formats forecast periods plus hourly rows |
+| `get_forecast(lat, lon)` | Returns structured forecast text + zone image URLs |
 | `forecast_discussion(lat, lon)` | Returns the latest AFD text for the CWA |
 | `get_alerts(lat, lon)` | Lists all active alerts for the point |
 
 Forecast periods include name (e.g. “Tonight”), temperature, wind, precipitation chance, and `detailedForecast` prose. Hourly rows add dewpoint, humidity, and short forecast text.
 
 Alert records include event type, severity, affected area, effective/expires times, description, and instructions.
+
+### Forecast-zone maps
+
+Official NWS forecast wording is written for a **forecast zone**, not a single lat/lon. `get_forecast` resolves `properties.forecastZone` from the points response and ensures a locator map is available.
+
+**Cache layout**
+
+```text
+s3://stormy-ai-files/forecast_zones/<ZONE_ID>.png
+```
+
+Example: `s3://stormy-ai-files/forecast_zones/NJZ018.png`
+
+Before plotting, the code checks whether that object already exists. Zone boundaries change rarely, so maps are reused across briefings for the same zone.
+
+**Plot contents**
+
+- Zoomed-out regional frame (zone is a minority of the map area)
+- Blue shaded zone polygon
+- Nearby city labels (Natural Earth populated places)
+- Coastline, rivers, lakes, state and county lines
+- Compact figure; briefing embeds use `width="480"` (radar/GFS stay at `720`)
+
+**`get_forecast` return shape**
+
+Unlike the other NWS tools (plain strings), `get_forecast` returns a structured dict so the briefing runner can embed the map reliably:
+
+| Field | Purpose |
+|-------|---------|
+| `status` | `success` or `error` |
+| `forecast` | Human-readable periods + hourly text (includes zone id / `markdown_image_url` header lines) |
+| `forecast_zone` | Zone id, name, state, cache/status metadata |
+| `s3_uri` / `https_url` / `markdown_image_url` | Public image links for the zone map |
+
+The briefing post-processor (`ensure_forecast_zone_markdown`) inserts a **Forecast Area** section near the top of the markdown (immediately after **Headline**) if the model omitted the image.
+
+The bucket policy must allow public `s3:GetObject` on `forecast_zones/*` so markdown clients can load the PNG (same pattern as `radar/*` and `models/*`).
 
 ### LangChain wrappers
 
@@ -102,7 +146,7 @@ current_conditions = tool(nws_api.current_conditions)
 forecast_discussion = tool(nws_api.forecast_discussion)
 ```
 
-The agent receives plain-text strings rather than structured JSON. That is intentional — NWS products are already human-readable, and the LLM synthesizes them into briefing sections (especially **Current Weather**, **Current Synoptic Setup**, **Outlook**, and **Forecast for Next 3 Days**).
+`get_forecast` returns structured JSON (including image URLs). The other NWS tools still return plain-text strings. The LLM uses both styles when writing **Forecast Area**, **Current Weather**, **Current Synoptic Setup**, **Outlook**, and **Forecast for Next 3 Days**.
 
 Typical agent flow: **geocode → get_alerts + current_conditions → … → get_forecast + forecast_discussion**.
 
@@ -114,6 +158,7 @@ Typical agent flow: **geocode → get_alerts + current_conditions → … → ge
 |----------|---------------------|
 | Official current temperature/wind/sky | **NWS current conditions** |
 | Official multi-day / hourly forecast | **NWS forecast** |
+| Geographic extent of that forecast text | **NWS forecast-zone map** |
 | Why the forecast looks this way | **NWS forecast discussion** |
 | Active tornado/severe/flood warning | **NWS alerts** |
 | Is it raining right now? | **MRMS** |
@@ -126,4 +171,13 @@ Typical agent flow: **geocode → get_alerts + current_conditions → … → ge
 ## Dependencies
 
 - `requests` — HTTP client for the NWS API
+- `matplotlib` / `cartopy` — forecast-zone map rendering
+- `s3fs` — cache existence checks and uploads via shared S3 helpers
 - `langchain_core` — `tool` wrapper
+
+### Environment overrides
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FORECAST_ZONE_S3_BUCKET` | `BRIEFING_S3_BUCKET` or `stormy-ai-files` | Bucket for cached zone PNGs |
+| `FORECAST_ZONE_S3_PREFIX` | `forecast_zones` | Key prefix (`<prefix>/<ZONE_ID>.png`) |
