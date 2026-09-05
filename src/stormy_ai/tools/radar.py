@@ -150,16 +150,22 @@ def find_nearest_nexrad(
     with Py-ART.
     """
 
-    nearest_station = None
-    nearest_distance = float("inf")
-    nearest_lat = None
-    nearest_lon = None
+    ranked = rank_nexrad_stations(latitude, longitude)
+    if not ranked:
+        raise RuntimeError("Unable to determine nearest NEXRAD station.")
+    return ranked[0]
 
+
+def rank_nexrad_stations(
+    latitude: float,
+    longitude: float,
+) -> list[dict]:
+    """Return NEXRAD stations sorted by distance to a location."""
+
+    ranked: list[dict] = []
     for station, location in NEXRAD_LOCATIONS.items():
-
         radar_lat = float(location["lat"])
         radar_lon = float(location["lon"])
-
         distance = float(
             haversine_km(
                 latitude,
@@ -168,25 +174,17 @@ def find_nearest_nexrad(
                 radar_lon,
             )
         )
+        ranked.append(
+            {
+                "station": station,
+                "latitude": radar_lat,
+                "longitude": radar_lon,
+                "distance_km": round(distance, 1),
+            }
+        )
 
-        if distance < nearest_distance:
-            nearest_station = station
-            nearest_distance = distance
-            nearest_lat = radar_lat
-            nearest_lon = radar_lon
-
-    if nearest_station is None:
-        raise RuntimeError("Unable to determine nearest NEXRAD station.")
-
-    return {
-        "station": nearest_station,
-        "latitude": nearest_lat,
-        "longitude": nearest_lon,
-        "distance_km": round(
-            nearest_distance,
-            1,
-        ),
-    }
+    ranked.sort(key=lambda item: item["distance_km"])
+    return ranked
 
 
 # ============================================================
@@ -196,11 +194,12 @@ def find_nearest_nexrad(
 
 def get_latest_nexrad_file(
     station: str,
-) -> str:
+) -> str | None:
     """
     Find the newest complete NEXRAD Level II volume.
 
-    Returns the full s3:// URI.
+    Returns the full s3:// URI, or ``None`` when the station has no
+    recent Level II objects in the public Unidata bucket.
     """
 
     station = station.upper()
@@ -237,7 +236,7 @@ def get_latest_nexrad_file(
             break
 
     if latest_file is None:
-        raise FileNotFoundError(f"No recent Level II data found for {station}")
+        return None
 
     return f"s3://{latest_file}"
 
@@ -286,74 +285,103 @@ def parse_nexrad_time(
 # ============================================================
 
 
+def _station_info_for_id(
+    station: str,
+    latitude: float,
+    longitude: float,
+) -> dict:
+    station = station.upper()
+    if station not in NEXRAD_LOCATIONS:
+        raise ValueError(f"Unknown NEXRAD station: {station}")
+
+    radar_lat = float(NEXRAD_LOCATIONS[station]["lat"])
+    radar_lon = float(NEXRAD_LOCATIONS[station]["lon"])
+    radar_distance = float(
+        haversine_km(
+            latitude,
+            longitude,
+            radar_lat,
+            radar_lon,
+        )
+    )
+    return {
+        "station": station,
+        "latitude": radar_lat,
+        "longitude": radar_lon,
+        "distance_km": round(radar_distance, 1),
+    }
+
+
 def load_latest_radar(
     latitude: float,
     longitude: float,
     radar_station: str | None = None,
+    *,
+    max_station_attempts: int = 8,
 ):
     """
     Determine the radar station, find its latest volume,
     and load it with Py-ART.
+
+    When no station is forced, try the nearest sites in order until one
+    has recent Level II data. Some Py-ART catalog entries (for example
+    research site KCRI) are nearer than the operational WSR-88D but are
+    often empty in the public Unidata bucket.
     """
 
+    tried: list[str] = []
+    candidates: list[dict] = []
+
     if radar_station:
-
-        station = radar_station.upper()
-
-        if station not in NEXRAD_LOCATIONS:
-            raise ValueError(f"Unknown NEXRAD station: {station}")
-
-        radar_lat = float(NEXRAD_LOCATIONS[station]["lat"])
-
-        radar_lon = float(NEXRAD_LOCATIONS[station]["lon"])
-
-        radar_distance = float(
-            haversine_km(
-                latitude,
-                longitude,
-                radar_lat,
-                radar_lon,
-            )
-        )
-
-        station_info = {
-            "station": station,
-            "latitude": radar_lat,
-            "longitude": radar_lon,
-            "distance_km": round(
-                radar_distance,
-                1,
-            ),
-        }
-
+        requested = _station_info_for_id(radar_station, latitude, longitude)
+        candidates.append(requested)
+        # If the requested site is offline, fall back to other nearby radars.
+        for station_info in rank_nexrad_stations(latitude, longitude):
+            if station_info["station"] == requested["station"]:
+                continue
+            candidates.append(station_info)
+            if len(candidates) >= max_station_attempts:
+                break
     else:
+        candidates = rank_nexrad_stations(latitude, longitude)[:max_station_attempts]
 
-        station_info = find_nearest_nexrad(
-            latitude,
-            longitude,
-        )
-
+    last_error: Exception | None = None
+    for station_info in candidates:
         station = station_info["station"]
+        tried.append(station)
+        s3_path = get_latest_nexrad_file(station)
+        if not s3_path:
+            continue
 
-    s3_path = get_latest_nexrad_file(station)
+        cached = _RADAR_VOLUME_CACHE.get(s3_path)
+        if cached is not None:
+            return cached
 
-    cached = _RADAR_VOLUME_CACHE.get(s3_path)
-    if cached is not None:
-        return cached
+        try:
+            radar = pyart.io.read_nexrad_archive(
+                s3_path,
+                storage_options={"anon": True},
+            )
+        except Exception as exc:
+            last_error = exc
+            continue
 
-    radar = pyart.io.read_nexrad_archive(
-        s3_path,
-        storage_options={"anon": True},
+        result = (
+            radar,
+            station_info,
+            s3_path,
+        )
+        _RADAR_VOLUME_CACHE.clear()
+        _RADAR_VOLUME_CACHE[s3_path] = result
+        return result
+
+    tried_label = ", ".join(tried) if tried else "none"
+    detail = f" Tried stations: {tried_label}."
+    if last_error is not None:
+        detail = f"{detail} Last read error: {last_error}"
+    raise FileNotFoundError(
+        "No recent Level II data found for nearby NEXRAD stations." + detail
     )
-
-    result = (
-        radar,
-        station_info,
-        s3_path,
-    )
-    _RADAR_VOLUME_CACHE.clear()
-    _RADAR_VOLUME_CACHE[s3_path] = result
-    return result
 
 
 # ============================================================
@@ -717,11 +745,23 @@ def analyze_nexrad_level2(
     thermodynamic data, and NWS alerts when appropriate.
     """
 
-    radar, station_info, s3_path = load_latest_radar(
-        latitude=latitude,
-        longitude=longitude,
-        radar_station=radar_station,
-    )
+    try:
+        radar, station_info, s3_path = load_latest_radar(
+            latitude=latitude,
+            longitude=longitude,
+            radar_station=radar_station,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        return {
+            "status": "error",
+            "error": str(exc),
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude,
+                "analysis_radius_km": radius_km,
+            },
+            "requested_radar_station": radar_station,
+        }
 
     # --------------------------------------------------------
     # Use the lowest elevation sweep
@@ -1238,11 +1278,24 @@ def plot_nexrad_level2(
     radar metadata.
     """
 
-    radar, station_info, s3_path = load_latest_radar(
-        latitude=latitude,
-        longitude=longitude,
-        radar_station=radar_station,
-    )
+    try:
+        radar, station_info, s3_path = load_latest_radar(
+            latitude=latitude,
+            longitude=longitude,
+            radar_station=radar_station,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        return {
+            "status": "error",
+            "error": str(exc),
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude,
+                "radius_km": radius_km,
+            },
+            "requested_radar_station": radar_station,
+            "requested_field": field,
+        }
 
     if sweep >= radar.nsweeps:
         raise ValueError(

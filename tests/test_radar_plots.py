@@ -1,12 +1,15 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import numpy as np
 
 from stormy_ai.tools.radar import (
     _range_ring_distances_km,
     _visible_field_max,
+    load_latest_radar,
     radar_plot_s3_uri,
+    rank_nexrad_stations,
 )
 
 
@@ -51,6 +54,41 @@ class RadarPlotHelpersTest(unittest.TestCase):
         )
 
         self.assertEqual(maximum, 31.0)
+
+    def test_rank_nexrad_stations_orders_by_distance(self):
+        # Near Norman, OK: research KCRI is closest, then TOKC, then KTLX.
+        ranked = rank_nexrad_stations(35.24, -97.46)
+        ids = [item["station"] for item in ranked[:3]]
+        self.assertEqual(ids[0], "KCRI")
+        self.assertIn("KTLX", ids)
+
+    @patch("stormy_ai.tools.radar.pyart.io.read_nexrad_archive")
+    @patch("stormy_ai.tools.radar.get_latest_nexrad_file")
+    def test_load_latest_radar_skips_empty_nearest_station(
+        self,
+        mock_latest,
+        mock_read,
+    ):
+        mock_latest.side_effect = lambda station: (
+            None
+            if station == "KCRI"
+            else (
+                "s3://unidata-nexrad-level2/2026/09/05/"
+                f"{station}/{station}20260905_120000_V06"
+            )
+        )
+        mock_read.return_value = object()
+
+        radar, station_info, s3_path = load_latest_radar(
+            latitude=35.24,
+            longitude=-97.46,
+            max_station_attempts=3,
+        )
+
+        self.assertIs(radar, mock_read.return_value)
+        self.assertNotEqual(station_info["station"], "KCRI")
+        self.assertIn(station_info["station"], s3_path)
+        self.assertGreaterEqual(mock_latest.call_count, 2)
 
 
 if __name__ == "__main__":

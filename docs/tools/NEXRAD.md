@@ -35,7 +35,7 @@ Stormy AI reads from the public Unidata S3 bucket:
 s3://unidata-nexrad-level2/{YYYY}/{MM}/{DD}/{STATION}/{STATION}{YYYYMMDD}_{HHMMSS}_V06
 ```
 
-The nearest station is chosen from Py-ART’s built-in `NEXRAD_LOCATIONS` table unless the agent passes an explicit four-character ID (e.g. `KPHL`).
+The nearest station is chosen from Py-ART’s built-in `NEXRAD_LOCATIONS` table unless the agent passes an explicit four-character ID (e.g. `KPHL`). If the nearest catalog site has no recent Level II objects in the public Unidata bucket (common for research radars such as `KCRI`), the loader tries the next-nearest stations until one succeeds.
 
 **Limitations**
 
@@ -69,9 +69,10 @@ lat/lon (+ optional radar_station, radius_km)
 | Function | Role |
 |----------|------|
 | `find_nearest_nexrad` | Haversine search over all WSR-88D sites |
-| `get_latest_nexrad_file` | Newest non-metadata file for a station |
+| `get_latest_nexrad_file` | Newest non-metadata file for a station, or `None` if empty |
+| `rank_nexrad_stations` | Catalog sites sorted by distance to the request point |
 | `parse_nexrad_time` | Filename → ISO UTC scan time |
-| `load_latest_radar` | End-to-end: station pick, S3 fetch, Py-ART load |
+| `load_latest_radar` | Try nearest sites until one has Level II, then Py-ART load |
 
 ### Spatial analysis (lowest sweep, sweep 0)
 
