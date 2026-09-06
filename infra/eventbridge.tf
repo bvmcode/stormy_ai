@@ -54,9 +54,9 @@ resource "aws_scheduler_schedule" "briefing" {
   name       = "${var.project_name}-briefing-schedule"
   group_name = "default"
 
-  description = "Run wx-briefing-agent at midnight, 6am, noon, and 6pm US Eastern"
+  description = "Run wx-briefing-agent hourly 8am–8pm ET and at 2am overnight"
 
-  schedule_expression          = "cron(0 0,6,12,18 * * ? *)"
+  schedule_expression          = "cron(0 2,8-20 * * ? *)"
   schedule_expression_timezone = var.briefing_schedule_timezone
 
   flexible_time_window {

@@ -56,7 +56,7 @@ Terraform in [`infra/`](../infra/) provisions:
 |----------|---------|
 | ECS cluster `stormy-ai` | Fargate cluster with Container Insights |
 | Task definition `wx-briefing-agent` | 16 vCPU / 120 GiB ARM64 container |
-| EventBridge Scheduler schedule | Runs the task at midnight, 6am, noon, and 6pm (`infra/eventbridge.tf`) |
+| EventBridge Scheduler schedule | Hourly 8am–8pm ET plus 2am overnight (`infra/eventbridge.tf`) |
 | IAM execution role | Pull ECR image, write CloudWatch logs, read Secrets Manager |
 | IAM task role | Read/write `stormy-ai-files` S3 bucket |
 | IAM Scheduler role | `ecs:RunTask` + `iam:PassRole` for scheduled launches |
@@ -83,8 +83,10 @@ make infra-apply
 After `make infra-apply`, **EventBridge Scheduler** (`aws_scheduler_schedule.briefing` in `infra/eventbridge.tf`) runs the ECS task on this cron:
 
 ```text
-cron(0 0,6,12,18 * * ? *)   → midnight, 6am, noon, 6pm
+cron(0 2,8-20 * * ? *)   → 2am, then hourly 8am–8pm (US Eastern)
 ```
+
+That is **hourly between 8am and 8pm**, and **every 6 hours overnight** (8pm → 2am → 8am). Keep `briefing.schedule_hours` in `config.yaml` in sync so markdown **Updated** / **Next update** headers match.
 
 The schedule timezone defaults to `America/New_York` (`briefing_schedule_timezone` in `infra/variables.tf`). The default location is `Atco, NJ 08004` (`default_location` in `infra/variables.tf`), passed as the container command to `main.py`.
 
@@ -153,7 +155,7 @@ Disable uploads with `python main.py --local`, `storage.upload_to_s3: false` in 
 | LLM | Ollama or HF (your choice in `config.yaml`) | HF via `HF_TOKEN` secret (typical) |
 | AWS creds | `aws configure` or env vars | Task IAM role |
 | Image arch | Host Python or `make local_run` (arm64) | ARM64 Fargate |
-| Schedule | Manual (`python main.py` or `python main.py --local`) | EventBridge Scheduler — 4× daily US Eastern |
+| Schedule | Manual (`python main.py` or `python main.py --local`) | EventBridge Scheduler — hourly 8am–8pm ET + 2am overnight |
 | Config | `config.yaml` + `.env` | Baked into image; override via env if needed |
 | S3 uploads | Optional (`--local` / `upload_to_s3: false`) | Enabled (task IAM role) |
 

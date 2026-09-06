@@ -117,7 +117,7 @@ def _section(data: dict[str, Any], key: str) -> dict[str, Any]:
 
 def _parse_schedule_hours(value: Any) -> tuple[int, ...]:
     if value is None:
-        return (0, 6, 12, 18)
+        return (2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
     if not isinstance(value, (list, tuple)):
         raise ValueError("briefing.schedule_hours must be a list of integers.")
     return tuple(int(hour) for hour in value)

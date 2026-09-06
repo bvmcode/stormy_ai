@@ -59,12 +59,12 @@ output "cloudwatch_log_group_name" {
 }
 
 output "briefing_schedule_name" {
-  description = "EventBridge Scheduler schedule that runs the briefing task four times daily."
+  description = "EventBridge Scheduler schedule that runs the briefing task on the daytime/overnight cadence."
   value       = aws_scheduler_schedule.briefing.name
 }
 
 output "briefing_schedule_expression" {
-  description = "Cron schedule for briefing runs (midnight, 6am, noon, 6pm in briefing_schedule_timezone)."
+  description = "Cron schedule for briefing runs (hourly 8am–8pm plus 2am overnight in briefing_schedule_timezone)."
   value       = aws_scheduler_schedule.briefing.schedule_expression
 }
 

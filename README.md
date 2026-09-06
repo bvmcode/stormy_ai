@@ -18,7 +18,7 @@ Each run produces a structured **weather briefing** with:
 - Outlook from the forecast discussion
 - Day-by-day forecast for the next three days
 
-Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the four-times-daily schedule (midnight, 6am, noon, 6pm US Eastern). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
+Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the EventBridge cadence (hourly 8am–8pm US Eastern, plus 2am overnight). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
 
 ---
 
@@ -116,7 +116,7 @@ docker run --rm \
   wx_briefing_agent "Denver, CO"
 ```
 
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the four-times-daily EventBridge Scheduler.
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the EventBridge Scheduler cadence (hourly 8am–8pm ET, overnight every 6 hours).
 
 ---
 
