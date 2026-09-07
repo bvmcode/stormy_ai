@@ -356,8 +356,8 @@ def briefing_schedule_times(when: datetime | None = None) -> tuple[datetime, dat
     """
     Return the current and next scheduled briefing update times.
 
-    Default slots match EventBridge: hourly 8am–8pm US Eastern, plus 2am
-    overnight (every 6 hours between 8pm and 8am).
+    Default slots match EventBridge: hourly 8am–8pm US Eastern, plus 4am
+    overnight.
     """
 
     briefing = get_settings().briefing
@@ -550,8 +550,7 @@ def run_briefing(location: str | None = None) -> dict:
     gfs_guidance = extract_gfs_guidance(messages)
     radar_image_url = radar_info["radar_image_url"] or radar_info["radar_s3_uri"]
     forecast_zone_image_url = (
-        forecast_zone_info["forecast_zone_image_url"]
-        or forecast_zone_info["forecast_zone_s3_uri"]
+        forecast_zone_info["forecast_zone_image_url"] or forecast_zone_info["forecast_zone_s3_uri"]
     )
     briefing_text = strip_llm_briefing_preamble(message_text(messages[-1].content))
     briefing_text = ensure_forecast_zone_markdown(

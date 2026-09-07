@@ -21,9 +21,9 @@ briefing:
   dir: briefings
   image_width: 720
   # Cadence matches the EventBridge schedule in infra/eventbridge.tf:
-  # hourly 8am–8pm ET, plus 2am overnight (every 6 hours 8pm–8am).
+  # hourly 8am–8pm ET, plus 4am overnight.
   schedule_tz: America/New_York
-  schedule_hours: [2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+  schedule_hours: [4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
 paths:
   radar_plot_dir: radar_plots

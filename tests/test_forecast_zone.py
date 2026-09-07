@@ -24,7 +24,6 @@ from stormy_ai.tools.nws import (
     forecast_zone_s3_uri,
 )
 
-
 SAMPLE_GEOMETRY = {
     "type": "Polygon",
     "coordinates": [
@@ -95,9 +94,7 @@ class ForecastZoneHelperTests(unittest.TestCase):
 
     def test_ensure_forecast_zone_markdown_uses_compact_width(self) -> None:
         text = "## Headline\n\nDry day.\n\n## Active Alerts\n\nNone.\n"
-        image_url = (
-            "https://stormy-ai-files.s3.amazonaws.com/forecast_zones/NJZ018.png"
-        )
+        image_url = "https://stormy-ai-files.s3.amazonaws.com/forecast_zones/NJZ018.png"
         result = ensure_forecast_zone_markdown(
             text,
             image_url,
@@ -225,9 +222,7 @@ class ForecastZoneCacheTests(unittest.TestCase):
 class ForecastZoneBriefingTests(unittest.TestCase):
     def test_ensure_forecast_zone_markdown_inserts_after_headline(self) -> None:
         text = "## Headline\n\nDry day.\n\n## Active Alerts\n\nNone.\n"
-        image_url = (
-            "https://stormy-ai-files.s3.amazonaws.com/forecast_zones/NJZ018.png"
-        )
+        image_url = "https://stormy-ai-files.s3.amazonaws.com/forecast_zones/NJZ018.png"
         result = ensure_forecast_zone_markdown(
             text,
             image_url,

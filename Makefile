@@ -1,15 +1,23 @@
-AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
-AWS_ACCESS_KEY_ID := $(shell aws configure export-credentials | jq -r '.AccessKeyId')
-AWS_SECRET_ACCESS_KEY := $(shell aws configure export-credentials | jq -r '.SecretAccessKey')
-HF_TOKEN := $(shell grep '^HF_TOKEN=' .env 2>/dev/null | cut -d '=' -f 2-)
-LANGSMITH_API_KEY := $(shell grep '^LANGSMITH_API_KEY=' .env 2>/dev/null | cut -d '=' -f 2-)
-LANGSMITH_PROJECT := $(or $(shell grep '^LANGSMITH_PROJECT=' .env 2>/dev/null | cut -d '=' -f 2- | head -1),stormy-ai)
-LANGSMITH_TRACING_ENABLED := $(shell grep -q '^LANGSMITH_TRACING=true' .env 2>/dev/null && echo true || echo false)
-AWS_REGION := us-east-1
+# Prefer env vars (GitHub Actions / CI); fall back to local aws configure and .env.
+AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text)
+AWS_ACCESS_KEY_ID ?= $(shell aws configure export-credentials | jq -r '.AccessKeyId')
+AWS_SECRET_ACCESS_KEY ?= $(shell aws configure export-credentials | jq -r '.SecretAccessKey')
+HF_TOKEN ?= $(shell grep '^HF_TOKEN=' .env 2>/dev/null | cut -d '=' -f 2-)
+LANGSMITH_API_KEY ?= $(shell grep '^LANGSMITH_API_KEY=' .env 2>/dev/null | cut -d '=' -f 2-)
+LANGSMITH_PROJECT ?= $(or $(shell grep '^LANGSMITH_PROJECT=' .env 2>/dev/null | cut -d '=' -f 2- | head -1),stormy-ai)
+LANGSMITH_TRACING_ENABLED ?= $(shell \
+	if [ -n "$$LANGSMITH_TRACING" ]; then \
+		[ "$$LANGSMITH_TRACING" = "true" ] && echo true || echo false; \
+	elif grep -q '^LANGSMITH_TRACING=true' .env 2>/dev/null; then \
+		echo true; \
+	else \
+		echo false; \
+	fi)
+AWS_REGION ?= us-east-1
 ECR_REPOSITORY_NAME := wx_briefing_agent
 IMAGE := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY_NAME):latest
 
-.PHONY: help build create auth push build_and_push create_repo local_run shell exec_shell test-creds test lint format infra-bootstrap infra-init infra-plan infra-apply infra-run-task
+.PHONY: help build create auth push build_and_push create_repo local_run shell exec_shell test-creds test lint format infra-bootstrap infra-init infra-plan infra-apply infra-run-agent local-run-agent
 
 help: ## Show available make targets
 	@echo "Stormy AI — make targets"
@@ -19,7 +27,7 @@ help: ## Show available make targets
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build linux/arm64 Docker image and tag for ECR
-	docker buildx build --platform linux/arm64 -t $(IMAGE) .
+	docker buildx build --platform linux/arm64 -t $(IMAGE) --load .
 
 create: ## Create the ECR repository (one-time)
 	aws ecr create-repository --repository-name $(ECR_REPOSITORY_NAME) --region $(AWS_REGION)
@@ -69,12 +77,13 @@ test-creds: ## Print HF_TOKEN and AWS creds loaded by the Makefile (debug)
 test: ## Run the test suite
 	uv run pytest tests/
 
-lint: ## Run flake8 and isort check on src/ and tests/
+lint: ## Check flake8, isort, and black on src/ and tests/
 	uv run flake8 --config .flake8 src/ tests/
-	uv run isort --check-only src/ tests/
+	uv run isort --check-only --profile black src/ tests/
+	uv run black --check --line-length 100 src/ tests/
 
 format: ## Auto-format with black and isort
-	uv run black -l 100 src/ tests/
+	uv run black --line-length 100 src/ tests/
 	uv run isort --profile black src/ tests/
 
 INFRA_DIR := infra
@@ -119,7 +128,7 @@ infra-apply: infra-bootstrap infra-init ## Bootstrap secrets and terraform apply
 		-var="langsmith_tracing_enabled=$(LANGSMITH_TRACING_ENABLED)" \
 		-var="langsmith_project=$(LANGSMITH_PROJECT)"
 
-run-agent: ## Run one ECS Fargate briefing task (manual trigger)
+infra-run-agent: ## Run one ECS Fargate briefing task (manual trigger)
 	@cluster=$$(terraform -chdir=$(INFRA_DIR) output -raw ecs_cluster_name); \
 	task_def=$$(terraform -chdir=$(INFRA_DIR) output -raw task_definition_arn); \
 	expected_cpu=$$(terraform -chdir=$(INFRA_DIR) output -raw task_cpu); \
@@ -140,3 +149,11 @@ run-agent: ## Run one ECS Fargate briefing task (manual trigger)
 		--launch-type FARGATE \
 		--network-configuration "awsvpcConfiguration={subnets=[$$subnets],securityGroups=[$$sg],assignPublicIp=ENABLED}" \
 		--region $(AWS_REGION)
+
+local-run-agent: ## Run one ECS Fargate briefing task (manual trigger)
+	docker run --rm \
+		-e HF_TOKEN=$(HF_TOKEN) \
+		-e AWS_DEFAULT_REGION=$(AWS_REGION) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		$(IMAGE)

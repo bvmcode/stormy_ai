@@ -28,7 +28,7 @@ def geocode_location(place: str) -> str:
     address, ZIP code, or landmark instead of coordinates.
 
     Args:
-        place: A place name (e.g. "New York City", "Atco, NJ 08004").
+        place: A place name (ex: "New York City", "Atco, NJ 08004").
     """
     data = None
     last_error = None

@@ -214,7 +214,7 @@ On the next `agent` hop, `build_system_prompt` can inject that diagnosis.
    - `ensure_radar_image_markdown` — embed radar via `markdown_image_url` (HTTPS when uploaded, else local path)
    - `ensure_gfs_guidance_markdown` — insert day 1–3 GFS charts if the model omitted them
    - `normalize_briefing_images` — convert markdown links and bare URLs to sized `<img>` tags
-5. `write_briefing_markdown` — prepend schedule metadata (**Updated** / **Next update** for the Eastern cadence: hourly 8am–8pm plus 2am overnight), write `briefings/YYYY-MM-DD_HHMM_<slug>.md`, and when `storage.upload_to_s3` is enabled upload to S3 and update `latest.txt` at the bucket root. With `--local` / `upload_to_s3: false`, only the local file is written and image embeds use local paths.
+5. `write_briefing_markdown` — prepend schedule metadata (**Updated** / **Next update** for the Eastern cadence: hourly 8am–8pm plus 4am overnight), write `briefings/YYYY-MM-DD_HHMM_<slug>.md`, and when `storage.upload_to_s3` is enabled upload to S3 and update `latest.txt` at the bucket root. With `--local` / `upload_to_s3: false`, only the local file is written and image embeds use local paths.
 
 There is a single briefing type: **weather** (`DEFAULT_BRIEFING_TYPE = "weather"`). Older “current vs daily” modes are gone; the prompt and runner always produce the same sectioned report (headline, forecast area, alerts, current weather, synoptic setup, GFS guidance, HRRR analysis, outlook, 3-day forecast, bottom line).
 

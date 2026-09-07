@@ -18,7 +18,7 @@ Each run produces a structured **weather briefing** with:
 - Outlook from the forecast discussion
 - Day-by-day forecast for the next three days
 
-Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the EventBridge cadence (hourly 8am–8pm US Eastern, plus 2am overnight). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, METAR station-model PNGs from `plot_metar_observations`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
+Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the EventBridge cadence (hourly 8am–8pm US Eastern, plus 4am overnight). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, METAR station-model PNGs from `plot_metar_observations`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
 
 ---
 
@@ -79,7 +79,7 @@ python main.py --local             # local files only; skip S3 uploads
 python main.py --local "Denver, CO"
 ```
 
-The CLI prints the briefing and writes a timestamped file under `briefings/`. With S3 uploads enabled (default), it also uploads the briefing and plot images when credentials are available, and updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags (zone maps use `width="480"`; radar/GFS use `720`) — public HTTPS URLs when uploaded, otherwise local absolute paths. With `--local`, artifacts stay under `briefings/`, `radar_plots/`, `model_plots/`, and `forecast_zones/`.
+The CLI prints the briefing and writes a timestamped file under `briefings/`. With S3 uploads enabled (default), it also uploads the briefing and plot images when credentials are available, and updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags (zone maps use `width="480"`; radar/GFS use `720`) — public HTTPS URLs when uploaded, otherwise local absolute paths. With `--local`, artifacts stay under `briefings/`, `radar_plots/`, `metar_plots/`, `model_plots/`, and `forecast_zones/`.
 
 ---
 
@@ -116,7 +116,7 @@ docker run --rm \
   wx_briefing_agent "Denver, CO"
 ```
 
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the EventBridge Scheduler cadence (hourly 8am–8pm ET, overnight every 6 hours).
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the EventBridge Scheduler cadence (hourly 8am–8pm ET, plus 4am overnight).
 
 ---
 
@@ -254,6 +254,7 @@ stormy_ai/
 ├── tests/                  Unit tests
 ├── briefings/              Generated markdown briefings
 ├── radar_plots/            Generated radar PNGs
+├── metar_plots/            Generated METAR station-model PNGs
 ├── model_plots/            Generated regional GFS chart PNGs
 ├── forecast_zones/         Cached forecast-zone PNGs (local)
 └── src/stormy_ai/

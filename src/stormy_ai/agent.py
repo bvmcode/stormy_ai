@@ -46,9 +46,17 @@ class WeatherState(MessagesState):
     diagnosis: NotRequired[dict | None]
 
 
-model = create_chat_model()
-model_with_tools = model.bind_tools(tools)
+_model_with_tools = None
 _tool_node = ToolNode(tools)
+
+
+def _get_model_with_tools():
+    """Lazily build chat model so imports/tests work without HF_TOKEN."""
+
+    global _model_with_tools
+    if _model_with_tools is None:
+        _model_with_tools = create_chat_model().bind_tools(tools)
+    return _model_with_tools
 
 
 def run_tools(state: WeatherState):
@@ -57,6 +65,7 @@ def run_tools(state: WeatherState):
     result = _tool_node.invoke(state)
     gc.collect()
     return result
+
 
 # These are the tools whose output should be captured
 # for deterministic precipitation diagnosis.
@@ -347,7 +356,7 @@ def call_model(
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
 
-    response = model_with_tools.invoke(messages)
+    response = _get_model_with_tools().invoke(messages)
 
     return {"messages": [response]}
 

@@ -380,9 +380,7 @@ def load_latest_radar(
     detail = f" Tried stations: {tried_label}."
     if last_error is not None:
         detail = f"{detail} Last read error: {last_error}"
-    raise FileNotFoundError(
-        "No recent Level II data found for nearby NEXRAD stations." + detail
-    )
+    raise FileNotFoundError("No recent Level II data found for nearby NEXRAD stations." + detail)
 
 
 # ============================================================
