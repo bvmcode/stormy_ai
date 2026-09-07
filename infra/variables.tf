@@ -59,7 +59,7 @@ variable "task_memory" {
 }
 
 variable "log_retention_days" {
-  description = "CloudWatch Logs retention for task output."
+  description = "CloudWatch Logs retention for task."
   type        = number
   default     = 14
 }

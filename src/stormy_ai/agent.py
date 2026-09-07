@@ -51,7 +51,7 @@ _tool_node = ToolNode(tools)
 
 
 def _get_model_with_tools():
-    """Lazily build the chat model so imports/tests work without HF_TOKEN."""
+    """Lazily build chat model so imports/tests work without HF_TOKEN."""
 
     global _model_with_tools
     if _model_with_tools is None:
