@@ -5,12 +5,14 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import perf_counter
 from zoneinfo import ZoneInfo
 
 from langchain_core.messages import ToolMessage
 
 from stormy_ai import graph
 from stormy_ai.config import get_settings, s3_uploads_enabled
+from stormy_ai.logging_config import format_kv, get_logger
 from stormy_ai.utils import (
     extract_zip_code,
     format_briefing_image,
@@ -24,6 +26,8 @@ from stormy_ai.utils import (
     upload_public_s3_object,
     upload_s3_text,
 )
+
+logger = get_logger(__name__)
 
 
 def _briefing_dir() -> Path:
@@ -507,7 +511,15 @@ def update_briefing_latest_pointer(briefing_s3_uri: str) -> str:
     """Write ``latest.txt`` at the bucket root with the briefing ``s3://`` URI."""
 
     latest_uri = briefing_latest_s3_uri()
+    logger.info(
+        "briefing.latest_pointer.start %s",
+        format_kv(briefing_s3_uri=briefing_s3_uri, latest_uri=latest_uri),
+    )
     upload_s3_text(f"{briefing_s3_uri.strip()}\n", latest_uri)
+    logger.info(
+        "briefing.latest_pointer.done %s",
+        format_kv(latest_uri=latest_uri),
+    )
     return latest_uri
 
 
@@ -529,8 +541,13 @@ def upload_briefing_to_s3(
 
     timestamp = when or datetime.now(timezone.utc)
     s3_uri = briefing_s3_uri(timestamp, zip_code)
+    logger.info(
+        "briefing.upload.start %s",
+        format_kv(local_path=path, s3_uri=s3_uri, zip_code=zip_code),
+    )
     upload_public_s3_object(path, s3_uri, content_type="text/markdown")
     update_briefing_latest_pointer(s3_uri)
+    logger.info("briefing.upload.done %s", format_kv(s3_uri=s3_uri))
     return s3_uri
 
 
@@ -589,9 +606,22 @@ def write_briefing_markdown(
         "---\n\n"
     )
     path.write_text(header + body + "\n", encoding="utf-8")
+    logger.info(
+        "briefing.written_local %s",
+        format_kv(
+            path=path,
+            location=location,
+            zip_code=extract_zip_code(location),
+            chars=len(body),
+        ),
+    )
 
     zip_code = extract_zip_code(location)
     if not s3_uploads_enabled():
+        logger.info(
+            "briefing.s3_skipped %s",
+            format_kv(reason="upload_to_s3_disabled", path=path),
+        )
         return {
             "briefing_path": path,
             "briefing_s3_uri": None,
@@ -612,6 +642,10 @@ def write_briefing_markdown(
         s3_uri = None
         latest_s3_uri = None
         s3_upload_error = str(exc)
+        logger.exception(
+            "briefing.s3_failed %s",
+            format_kv(path=path, zip_code=zip_code, error=s3_upload_error),
+        )
 
     return {
         "briefing_path": path,
@@ -627,19 +661,55 @@ def run_briefing(location: str | None = None) -> dict:
 
     briefing_config = get_settings().briefing
     location = location or briefing_config.default_location
-
-    result = graph.invoke(
-        {
-            "messages": [
-                (
-                    "user",
-                    build_briefing_request(location),
-                )
-            ]
-        }
+    logger.info(
+        "briefing.run.start %s",
+        format_kv(
+            location=location,
+            briefing_type=briefing_config.briefing_type,
+            upload_to_s3=s3_uploads_enabled(),
+        ),
     )
+    started = perf_counter()
+
+    try:
+        result = graph.invoke(
+            {
+                "messages": [
+                    (
+                        "user",
+                        build_briefing_request(location),
+                    )
+                ]
+            }
+        )
+    except Exception:
+        logger.exception(
+            "briefing.graph.failed %s",
+            format_kv(
+                location=location,
+                duration_s=perf_counter() - started,
+            ),
+        )
+        raise
 
     messages = result["messages"]
+    tool_names = sorted(
+        {
+            message.name
+            for message in messages
+            if isinstance(message, ToolMessage) and message.name
+        }
+    )
+    logger.info(
+        "briefing.graph.done %s",
+        format_kv(
+            location=location,
+            duration_s=perf_counter() - started,
+            message_count=len(messages),
+            tools_used=",".join(tool_names) or "none",
+        ),
+    )
+
     radar_info = extract_radar_plot_info(messages)
     metar_info = extract_metar_plot_info(messages)
     forecast_zone_info = extract_forecast_zone_info(messages)
@@ -677,6 +747,21 @@ def run_briefing(location: str | None = None) -> dict:
         forecast_zone_image_url=forecast_zone_image_url,
         forecast_zone_id=forecast_zone_info["forecast_zone_id"],
         forecast_zone_name=forecast_zone_info["forecast_zone_name"],
+    )
+
+    logger.info(
+        "briefing.run.complete %s",
+        format_kv(
+            location=location,
+            duration_s=perf_counter() - started,
+            briefing_path=written["briefing_path"],
+            briefing_s3_uri=written["briefing_s3_uri"],
+            s3_upload_error=written["s3_upload_error"],
+            has_radar=bool(radar_image_url),
+            has_metar=bool(metar_image_url),
+            has_forecast_zone=bool(forecast_zone_image_url),
+            has_gfs=bool(gfs_guidance),
+        ),
     )
 
     return {

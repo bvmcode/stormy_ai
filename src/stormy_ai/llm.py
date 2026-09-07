@@ -9,6 +9,9 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from stormy_ai.config import LLMConfig, get_settings
+from stormy_ai.logging_config import format_kv, get_logger
+
+logger = get_logger(__name__)
 
 
 def huggingface_model_id(model: str, inference_provider: str) -> str:
@@ -26,6 +29,15 @@ def create_chat_model(llm: LLMConfig | None = None) -> BaseChatModel:
     config = llm or get_settings().llm
 
     if config.provider == "ollama":
+        logger.info(
+            "llm.create %s",
+            format_kv(
+                provider="ollama",
+                model=config.model,
+                base_url=config.ollama.base_url,
+                temperature=config.temperature,
+            ),
+        )
         return ChatOllama(
             model=config.model,
             base_url=config.ollama.base_url,
@@ -35,6 +47,10 @@ def create_chat_model(llm: LLMConfig | None = None) -> BaseChatModel:
     if config.provider == "huggingface":
         api_key = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
         if not api_key:
+            logger.error(
+                "llm.missing_token %s",
+                format_kv(provider="huggingface", model=config.model),
+            )
             raise ValueError(
                 "HF_TOKEN is required when llm.provider is 'huggingface'. "
                 "Add it to .env or your environment."
@@ -44,6 +60,16 @@ def create_chat_model(llm: LLMConfig | None = None) -> BaseChatModel:
             config.model,
             config.huggingface.inference_provider,
         )
+        logger.info(
+            "llm.create %s",
+            format_kv(
+                provider="huggingface",
+                model=model_id,
+                base_url=config.huggingface.base_url,
+                inference_provider=config.huggingface.inference_provider,
+                temperature=config.temperature,
+            ),
+        )
         return ChatOpenAI(
             model=model_id,
             base_url=config.huggingface.base_url,
@@ -51,4 +77,5 @@ def create_chat_model(llm: LLMConfig | None = None) -> BaseChatModel:
             temperature=config.temperature,
         )
 
+    logger.error("llm.unsupported_provider provider=%s", config.provider)
     raise ValueError(f"Unsupported llm.provider: {config.provider!r}")

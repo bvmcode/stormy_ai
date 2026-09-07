@@ -5,6 +5,10 @@ import re
 import requests
 from langchain_core.tools import tool
 
+from stormy_ai.logging_config import format_kv, get_logger
+
+logger = get_logger(__name__)
+
 # Open-Meteo geocoding converts place names to lat/lon.
 # No API key is required.
 GEOCODE_API_BASE = "https://geocoding-api.open-meteo.com/v1/search"
@@ -46,6 +50,10 @@ def geocode_location(place: str) -> str:
             data = response.json()
         except requests.RequestException as exc:
             last_error = exc
+            logger.warning(
+                "geocode.request_failed %s",
+                format_kv(place=place, query=name, error=exc),
+            )
             continue
 
         results = data.get("results") or []
@@ -53,14 +61,21 @@ def geocode_location(place: str) -> str:
             break
     else:
         if last_error is not None:
+            logger.error(
+                "geocode.failed %s",
+                format_kv(place=place, error=last_error),
+            )
             return f"Unable to geocode '{place}': {last_error}"
+        logger.warning("geocode.no_results %s", format_kv(place=place))
         return f"No results found for '{place}'."
 
     if not data:
+        logger.warning("geocode.no_results %s", format_kv(place=place))
         return f"No results found for '{place}'."
 
     results = data.get("results") or []
     if not results:
+        logger.warning("geocode.no_results %s", format_kv(place=place))
         return f"No results found for '{place}'."
 
     match = results[0]
@@ -71,6 +86,15 @@ def geocode_location(place: str) -> str:
         parts.append(match["country"])
     display_name = ", ".join(parts)
 
+    logger.info(
+        "geocode.matched %s",
+        format_kv(
+            place=place,
+            display_name=display_name,
+            latitude=match["latitude"],
+            longitude=match["longitude"],
+        ),
+    )
     return (
         f"Found: {display_name}\n"
         f"Latitude: {match['latitude']}\n"

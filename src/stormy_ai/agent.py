@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+from time import perf_counter
 
 from langchain_core.messages import (
     AIMessage,
@@ -22,9 +23,12 @@ from typing_extensions import NotRequired
 
 from stormy_ai.diagnostics import diagnose_precipitation
 from stormy_ai.llm import create_chat_model
+from stormy_ai.logging_config import format_kv, get_logger
 from stormy_ai.prompts import SYSTEM_PROMPT
 from stormy_ai.tools import tools
 from stormy_ai.utils import parse_tool_content
+
+logger = get_logger(__name__)
 
 
 class WeatherState(MessagesState):
@@ -59,10 +63,48 @@ def _get_model_with_tools():
     return _model_with_tools
 
 
+def _pending_tool_names(state: WeatherState) -> list[str]:
+    """Return tool names requested by the latest AIMessage, if any."""
+
+    messages = state.get("messages") or []
+    for message in reversed(messages):
+        if isinstance(message, AIMessage) and message.tool_calls:
+            names = []
+            for tool_call in message.tool_calls:
+                name = tool_call.get("name")
+                if name:
+                    names.append(name)
+            return names
+    return []
+
+
 def run_tools(state: WeatherState):
     """Execute tool calls and release large intermediate allocations."""
 
-    result = _tool_node.invoke(state)
+    tool_names = _pending_tool_names(state)
+    logger.info(
+        "graph.tools_batch.start %s",
+        format_kv(count=len(tool_names), tools=",".join(tool_names) or "none"),
+    )
+    started = perf_counter()
+    try:
+        result = _tool_node.invoke(state)
+    except Exception:
+        logger.exception(
+            "graph.tools_batch.failed %s",
+            format_kv(
+                duration_s=perf_counter() - started,
+                tools=",".join(tool_names) or "none",
+            ),
+        )
+        raise
+    logger.info(
+        "graph.tools_batch.done %s",
+        format_kv(
+            duration_s=perf_counter() - started,
+            tools=",".join(tool_names) or "none",
+        ),
+    )
     gc.collect()
     return result
 
@@ -245,12 +287,52 @@ def collect_weather_results(
     # MRMS + HRRR are the minimum inputs needed by our
     # precipitation diagnosis.
     if mrms is not None and hrrr is not None:
-
-        diagnosis = diagnose_precipitation(
-            mrms_result=mrms,
-            nexrad_result=nexrad,
-            hrrr_result=hrrr,
-            lightning_result=lightning,
+        logger.info(
+            "graph.diagnosis.start %s",
+            format_kv(
+                has_mrms=True,
+                has_hrrr=True,
+                has_nexrad=nexrad is not None,
+                has_lightning=lightning is not None,
+            ),
+        )
+        started = perf_counter()
+        try:
+            diagnosis = diagnose_precipitation(
+                mrms_result=mrms,
+                nexrad_result=nexrad,
+                hrrr_result=hrrr,
+                lightning_result=lightning,
+            )
+        except Exception:
+            logger.exception(
+                "graph.diagnosis.failed %s",
+                format_kv(duration_s=perf_counter() - started),
+            )
+            raise
+        precip_type = None
+        intensity = None
+        if isinstance(diagnosis, dict):
+            diagnosis_block = diagnosis.get("diagnosis") or {}
+            precip_type = diagnosis_block.get("type")
+            intensity = diagnosis_block.get("intensity")
+        logger.info(
+            "graph.diagnosis.done %s",
+            format_kv(
+                duration_s=perf_counter() - started,
+                precip_type=precip_type,
+                intensity=intensity,
+            ),
+        )
+    else:
+        logger.info(
+            "graph.diagnosis.skipped %s",
+            format_kv(
+                has_mrms=mrms is not None,
+                has_hrrr=hrrr is not None,
+                has_nexrad=nexrad is not None,
+                has_lightning=lightning is not None,
+            ),
         )
 
     return {
@@ -355,8 +437,36 @@ def call_model(
     system_prompt = build_system_prompt(state)
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
+    has_diagnosis = state.get("diagnosis") is not None
+    logger.info(
+        "graph.model.start %s",
+        format_kv(
+            message_count=len(messages),
+            has_diagnosis=has_diagnosis,
+        ),
+    )
+    started = perf_counter()
+    try:
+        response = _get_model_with_tools().invoke(messages)
+    except Exception:
+        logger.exception(
+            "graph.model.failed %s",
+            format_kv(duration_s=perf_counter() - started),
+        )
+        raise
 
-    response = _get_model_with_tools().invoke(messages)
+    tool_calls = getattr(response, "tool_calls", None) or []
+    tool_names = [
+        call.get("name") for call in tool_calls if isinstance(call, dict) and call.get("name")
+    ]
+    logger.info(
+        "graph.model.done %s",
+        format_kv(
+            duration_s=perf_counter() - started,
+            tool_call_count=len(tool_calls),
+            tools=",".join(tool_names) or "none",
+        ),
+    )
 
     return {"messages": [response]}
 

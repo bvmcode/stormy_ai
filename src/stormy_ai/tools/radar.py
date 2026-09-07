@@ -29,7 +29,10 @@ from pyart.io.nexrad_common import NEXRAD_LOCATIONS
 from pydantic import BaseModel, Field
 
 from stormy_ai.config import s3_uploads_enabled
+from stormy_ai.logging_config import format_kv, get_logger
 from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
+
+logger = get_logger(__name__)
 
 # ============================================================
 # Configuration
@@ -365,6 +368,10 @@ def load_latest_radar(
             )
         except Exception as exc:
             last_error = exc
+            logger.warning(
+                "nexrad.read_failed %s",
+                format_kv(station=station, path=s3_path, error=exc),
+            )
             continue
 
         result = (
@@ -374,12 +381,25 @@ def load_latest_radar(
         )
         _RADAR_VOLUME_CACHE.clear()
         _RADAR_VOLUME_CACHE[s3_path] = result
+        logger.info(
+            "nexrad.loaded %s",
+            format_kv(station=station, path=s3_path, distance_km=station_info.get("distance_km")),
+        )
         return result
 
     tried_label = ", ".join(tried) if tried else "none"
     detail = f" Tried stations: {tried_label}."
     if last_error is not None:
         detail = f"{detail} Last read error: {last_error}"
+    logger.error(
+        "nexrad.unavailable %s",
+        format_kv(
+            latitude=latitude,
+            longitude=longitude,
+            tried=tried_label,
+            error=last_error,
+        ),
+    )
     raise FileNotFoundError("No recent Level II data found for nearby NEXRAD stations." + detail)
 
 
