@@ -42,7 +42,7 @@ _configure_langsmith_env()
 
 
 def _find_config_path() -> Path:
-    """Find the config.yaml file."""
+    """Find the config yaml file."""
     env_path = os.environ.get("STORMY_CONFIG")
     if env_path:
         return Path(env_path).expanduser().resolve()
