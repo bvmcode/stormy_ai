@@ -11,6 +11,10 @@ from pathlib import Path
 
 import s3fs
 
+from stormy_ai.logging_config import format_kv, get_logger
+
+logger = get_logger(__name__)
+
 ZIP_CODE_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
 MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+|s3://[^)\s]+)\)")
 HTML_IMG_RE = re.compile(r"<img\b([^>]*)>", re.IGNORECASE)
@@ -81,8 +85,25 @@ def upload_public_s3_object(
     put_kwargs = {
         "ContentType": content_type or guessed_type or "application/octet-stream",
     }
-    filesystem = s3fs.S3FileSystem(anon=False)
-    filesystem.put(str(path), s3_uri.removeprefix("s3://"), **put_kwargs)
+    logger.info(
+        "s3.upload_object.start %s",
+        format_kv(
+            local_path=path,
+            s3_uri=s3_uri,
+            content_type=put_kwargs["ContentType"],
+            bytes=path.stat().st_size,
+        ),
+    )
+    try:
+        filesystem = s3fs.S3FileSystem(anon=False)
+        filesystem.put(str(path), s3_uri.removeprefix("s3://"), **put_kwargs)
+    except Exception:
+        logger.exception(
+            "s3.upload_object.failed %s",
+            format_kv(local_path=path, s3_uri=s3_uri),
+        )
+        raise
+    logger.info("s3.upload_object.done %s", format_kv(s3_uri=s3_uri))
     return s3_uri
 
 
@@ -101,13 +122,22 @@ def upload_s3_text(
     if not s3_uri.startswith("s3://"):
         raise ValueError(f"Expected an s3:// URI, got: {s3_uri!r}")
 
-    filesystem = s3fs.S3FileSystem(anon=False)
-    with filesystem.open(
-        s3_uri.removeprefix("s3://"),
-        "wb",
-        ContentType=content_type,
-    ) as handle:
-        handle.write(content.encode("utf-8"))
+    logger.info(
+        "s3.upload_text.start %s",
+        format_kv(s3_uri=s3_uri, content_type=content_type, chars=len(content)),
+    )
+    try:
+        filesystem = s3fs.S3FileSystem(anon=False)
+        with filesystem.open(
+            s3_uri.removeprefix("s3://"),
+            "wb",
+            ContentType=content_type,
+        ) as handle:
+            handle.write(content.encode("utf-8"))
+    except Exception:
+        logger.exception("s3.upload_text.failed %s", format_kv(s3_uri=s3_uri))
+        raise
+    logger.info("s3.upload_text.done %s", format_kv(s3_uri=s3_uri))
     return s3_uri
 
 

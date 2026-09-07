@@ -22,7 +22,10 @@ from pydantic import BaseModel, Field, field_validator
 from scipy.ndimage import gaussian_filter, maximum_filter, minimum_filter
 
 from stormy_ai.config import s3_uploads_enabled
+from stormy_ai.logging_config import format_kv, get_logger
 from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
+
+logger = get_logger(__name__)
 
 plt.switch_backend("Agg")
 
@@ -998,6 +1001,15 @@ def generate_latest_gfs_guidance(
     images = []
     markdown_hours = _markdown_forecast_hours(forecast_hours)
     model_date = pd.Timestamp(cycle).strftime("%Y-%m-%d")
+    logger.info(
+        "gfs.cycle.selected %s",
+        format_kv(
+            cycle=cycle,
+            forecast_hours=",".join(str(hour) for hour in forecast_hours),
+            latitude=latitude,
+            longitude=longitude,
+        ),
+    )
 
     for forecast_hour in forecast_hours:
         gfs = Herbie(
@@ -1042,6 +1054,15 @@ def generate_latest_gfs_guidance(
                 except Exception as exc:
                     s3_uri = None
                     s3_upload_error = str(exc)
+                    logger.warning(
+                        "gfs.upload_failed %s",
+                        format_kv(
+                            image_type=image_type,
+                            forecast_hour=forecast_hour,
+                            path=output_path,
+                            error=exc,
+                        ),
+                    )
             else:
                 s3_uri = None
                 s3_upload_error = None

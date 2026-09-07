@@ -126,8 +126,16 @@ Task role credentials are provided automatically by ECS — no static AWS keys i
 
 ### Logs
 
+Container stdout/stderr goes to CloudWatch log group `/ecs/wx-briefing-agent`. Application logs use timestamped `key=value` lines (for example `tool.start`, `tool.done`, `briefing.run.complete`, `s3.upload_object.failed`) so failures are searchable without dumping full payloads. Set `STORMY_LOG_LEVEL` (`DEBUG`, `INFO`, `WARNING`, `ERROR`; default `INFO`) to adjust verbosity.
+
 ```bash
 aws logs tail /ecs/wx-briefing-agent --follow --region us-east-1
+
+# Useful filters
+aws logs filter-log-events \
+  --log-group-name /ecs/wx-briefing-agent \
+  --filter-pattern '?tool.failed ?briefing.graph.failed ?s3.upload_object.failed ?ERROR' \
+  --region us-east-1
 ```
 
 ---

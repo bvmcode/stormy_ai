@@ -18,7 +18,10 @@ from langchain_core.tools import tool
 from matplotlib import patheffects
 
 from stormy_ai.config import get_settings, s3_uploads_enabled
+from stormy_ai.logging_config import format_kv, get_logger
 from stormy_ai.utils import s3_uri_to_https_url, upload_public_s3_object
+
+logger = get_logger(__name__)
 
 FORECAST_ZONE_S3_BUCKET = os.environ.get(
     "FORECAST_ZONE_S3_BUCKET",
@@ -483,7 +486,11 @@ class NwsApi:
             )
             response.raise_for_status()
             return response.json()
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning(
+                "nws.request_failed %s",
+                format_kv(url=url, error=exc),
+            )
             return None
 
     def _get_points(self, latitude: float, longitude: float) -> dict | None:

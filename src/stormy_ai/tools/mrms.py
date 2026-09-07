@@ -12,6 +12,10 @@ import xarray as xr
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from stormy_ai.logging_config import format_kv, get_logger
+
+logger = get_logger(__name__)
+
 # ============================================================
 # Configuration
 # ============================================================
@@ -63,7 +67,10 @@ def get_mrms_data(
 
         path = f"{MRMS_BUCKET}/CONUS/" f"{product}/" f"{date}/"
 
-        print(f"Checking: s3://{path}")
+        logger.debug(
+            "mrms.list %s",
+            format_kv(product=product, path=f"s3://{path}"),
+        )
 
         files = fs.glob(f"{path}*.grib2.gz")
 
@@ -74,9 +81,13 @@ def get_mrms_data(
             break
 
     if latest_file is None:
+        logger.error("mrms.missing %s", format_kv(product=product))
         raise FileNotFoundError(f"No recent MRMS files found for {product}")
 
-    print(f"Reading: s3://{latest_file}")
+    logger.info(
+        "mrms.read %s",
+        format_kv(product=product, path=f"s3://{latest_file}"),
+    )
 
     # --------------------------------------------------------
     # Download compressed MRMS GRIB
@@ -685,7 +696,7 @@ def get_mrms_precipitation_analysis(
     # Load precipitation rate
     # --------------------------------------------------------
 
-    print("\nDownloading MRMS PrecipRate...")
+    logger.info("mrms.download.start product=%s", PRECIP_PRODUCT)
 
     precip_da, precip_file = get_mrms_data(PRECIP_PRODUCT)
 
@@ -719,7 +730,7 @@ def get_mrms_precipitation_analysis(
     del precip_da, conus_precip_values
     gc.collect()
 
-    print("\nDownloading MRMS Reflectivity...")
+    logger.info("mrms.download.start product=%s", REFLECTIVITY_PRODUCT)
 
     reflectivity_da, reflectivity_file = get_mrms_data(REFLECTIVITY_PRODUCT)
 
