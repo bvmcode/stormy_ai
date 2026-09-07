@@ -5,6 +5,6 @@ from stormy_ai.logging_config import configure_logging
 
 configure_logging()
 
-from stormy_ai.agent import graph
+from stormy_ai.agent import graph  # noqa: E402
 
 __all__ = ["graph"]

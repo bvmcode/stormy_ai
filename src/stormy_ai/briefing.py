@@ -694,11 +694,7 @@ def run_briefing(location: str | None = None) -> dict:
 
     messages = result["messages"]
     tool_names = sorted(
-        {
-            message.name
-            for message in messages
-            if isinstance(message, ToolMessage) and message.name
-        }
+        {message.name for message in messages if isinstance(message, ToolMessage) and message.name}
     )
     logger.info(
         "briefing.graph.done %s",
