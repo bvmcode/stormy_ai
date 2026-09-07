@@ -298,7 +298,7 @@ def _station_coordinates(station: dict) -> tuple[float, float] | None:
         return None
     try:
         return float(coordinates[0]), float(coordinates[1])
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -398,7 +398,7 @@ def _observation_record(
         try:
             obs_lon = float(coordinates[0])
             obs_lat = float(coordinates[1])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
 
     pressure_mb = _pressure_mb(props)
@@ -409,9 +409,7 @@ def _observation_record(
         "latitude": obs_lat,
         "distance_km": station["distance_km"],
         "timestamp": props.get("timestamp"),
-        "temperature_f": (
-            round(_c_to_f(temperature_c)) if temperature_c is not None else None
-        ),
+        "temperature_f": (round(_c_to_f(temperature_c)) if temperature_c is not None else None),
         "dewpoint_f": round(_c_to_f(dewpoint_c)) if dewpoint_c is not None else None,
         "pressure_mb": round(pressure_mb, 1) if pressure_mb is not None else None,
         "sky_cover_oktas": _cloud_cover_oktas(props.get("cloudLayers")),
@@ -624,9 +622,7 @@ def render_metar_station_plot(
         spine.set_color(_PLOT_BOUNDARY)
 
     timestamps = [
-        _parse_timestamp(item.get("timestamp"))
-        for item in observations
-        if item.get("timestamp")
+        _parse_timestamp(item.get("timestamp")) for item in observations if item.get("timestamp")
     ]
     timestamps = [item for item in timestamps if item is not None]
     newest = max(timestamps) if timestamps else datetime.now(timezone.utc)
@@ -744,9 +740,7 @@ def plot_metar_observations(
     )
 
     timestamps = [
-        _parse_timestamp(item.get("timestamp"))
-        for item in observations
-        if item.get("timestamp")
+        _parse_timestamp(item.get("timestamp")) for item in observations if item.get("timestamp")
     ]
     timestamps = [item for item in timestamps if item is not None]
     plot_time = max(timestamps) if timestamps else datetime.now(timezone.utc)
