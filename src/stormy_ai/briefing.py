@@ -355,8 +355,8 @@ def briefing_schedule_times(when: datetime | None = None) -> tuple[datetime, dat
     """
     Return the current and next scheduled briefing update times.
 
-    Default slots match EventBridge: hourly 8am–8pm US Eastern, plus 2am
-    overnight (every 6 hours between 8pm and 8am).
+    Default slots match EventBridge: hourly 8am–8pm US Eastern, plus 4am
+    overnight.
     """
 
     briefing = get_settings().briefing

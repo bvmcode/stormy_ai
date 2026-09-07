@@ -119,7 +119,7 @@ infra-apply: infra-bootstrap infra-init ## Bootstrap secrets and terraform apply
 		-var="langsmith_tracing_enabled=$(LANGSMITH_TRACING_ENABLED)" \
 		-var="langsmith_project=$(LANGSMITH_PROJECT)"
 
-run-agent: ## Run one ECS Fargate briefing task (manual trigger)
+infra-run-agent: ## Run one ECS Fargate briefing task (manual trigger)
 	@cluster=$$(terraform -chdir=$(INFRA_DIR) output -raw ecs_cluster_name); \
 	task_def=$$(terraform -chdir=$(INFRA_DIR) output -raw task_definition_arn); \
 	expected_cpu=$$(terraform -chdir=$(INFRA_DIR) output -raw task_cpu); \
@@ -140,3 +140,11 @@ run-agent: ## Run one ECS Fargate briefing task (manual trigger)
 		--launch-type FARGATE \
 		--network-configuration "awsvpcConfiguration={subnets=[$$subnets],securityGroups=[$$sg],assignPublicIp=ENABLED}" \
 		--region $(AWS_REGION)
+
+local-run-agent: ## Run one ECS Fargate briefing task (manual trigger)
+	docker run --rm \
+		-e HF_TOKEN=$(HF_TOKEN) \
+		-e AWS_DEFAULT_REGION=$(AWS_REGION) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		$(IMAGE)

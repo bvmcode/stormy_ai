@@ -33,11 +33,11 @@ class BriefingScheduleTests(unittest.TestCase):
         self.assertEqual(current, _eastern(2026, 8, 29, 12))
         self.assertEqual(next_update, _eastern(2026, 8, 29, 13))
 
-    def test_overnight_run_uses_2am_slot(self) -> None:
-        when = _eastern(2026, 8, 29, 3, 15)
+    def test_overnight_run_uses_4am_slot(self) -> None:
+        when = _eastern(2026, 8, 29, 5, 15)
         current, next_update = briefing_schedule_times(when)
 
-        self.assertEqual(current, _eastern(2026, 8, 29, 2))
+        self.assertEqual(current, _eastern(2026, 8, 29, 4))
         self.assertEqual(next_update, _eastern(2026, 8, 29, 8))
 
     def test_evening_run_advances_hourly_until_8pm(self) -> None:
@@ -47,12 +47,12 @@ class BriefingScheduleTests(unittest.TestCase):
         self.assertEqual(current, _eastern(2026, 8, 29, 19))
         self.assertEqual(next_update, _eastern(2026, 8, 29, 20))
 
-    def test_after_8pm_wraps_to_2am(self) -> None:
+    def test_after_8pm_wraps_to_4am(self) -> None:
         when = _eastern(2026, 8, 29, 21, 10)
         current, next_update = briefing_schedule_times(when)
 
         self.assertEqual(current, _eastern(2026, 8, 29, 20))
-        self.assertEqual(next_update, _eastern(2026, 8, 30, 2))
+        self.assertEqual(next_update, _eastern(2026, 8, 30, 4))
 
     def test_exact_schedule_boundary(self) -> None:
         when = _eastern(2026, 8, 29, 8, 0)
@@ -74,7 +74,7 @@ class BriefingScheduleTests(unittest.TestCase):
     def test_configured_schedule_hours(self) -> None:
         self.assertEqual(
             get_settings().briefing.schedule_hours,
-            (2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20),
+            (4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20),
         )
 
 

@@ -64,7 +64,7 @@ output "briefing_schedule_name" {
 }
 
 output "briefing_schedule_expression" {
-  description = "Cron schedule for briefing runs (hourly 8am–8pm plus 2am overnight in briefing_schedule_timezone)."
+  description = "Cron schedule for briefing runs (hourly 8am–8pm plus 4am overnight in briefing_schedule_timezone)."
   value       = aws_scheduler_schedule.briefing.schedule_expression
 }
 
