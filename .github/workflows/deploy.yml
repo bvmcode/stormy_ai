@@ -1,7 +1,5 @@
 # Runs on merge (push) to main. Path filters decide docker vs infra jobs.
-#
-# Secrets must be Repository secrets (Settings → Secrets and variables → Actions),
-# or Environment secrets whose name matches jobs.*.environment below.
+# Jobs use the GitHub Environment "prod" (Settings → Environments → prod).
 name: Deploy
 
 on:
@@ -53,6 +51,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
+    environment: prod
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
@@ -95,9 +94,8 @@ jobs:
           HAS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID != '' }}
         run: |
           if [ "$HAS_KEY" != "true" ] || [ "$HAS_SECRET" != "true" ] || [ "$HAS_ACCOUNT" != "true" ]; then
-            echo "::error::AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and/or AWS_ACCOUNT_ID are empty."
-            echo "Add them under Settings → Secrets and variables → Actions → Repository secrets."
-            echo "Environment secrets are only visible when the job sets environment: <exact-name>."
+            echo "::error::AWS secrets are empty in the 'prod' environment."
+            echo "Confirm they exist under Settings → Environments → prod → Environment secrets."
             exit 1
           fi
 
@@ -116,6 +114,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
+    environment: prod
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
@@ -135,9 +134,8 @@ jobs:
           HAS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID != '' }}
         run: |
           if [ "$HAS_KEY" != "true" ] || [ "$HAS_SECRET" != "true" ] || [ "$HAS_ACCOUNT" != "true" ]; then
-            echo "::error::AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and/or AWS_ACCOUNT_ID are empty."
-            echo "Add them under Settings → Secrets and variables → Actions → Repository secrets."
-            echo "Environment secrets are only visible when the job sets environment: <exact-name>."
+            echo "::error::AWS secrets are empty in the 'prod' environment."
+            echo "Confirm they exist under Settings → Environments → prod → Environment secrets."
             exit 1
           fi
 
