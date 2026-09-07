@@ -80,7 +80,7 @@ Stormy AI adds optional meteorological fields for the **current turn**:
 | `lightning` | `get_lightning` | GLM flash activity |
 | `diagnosis` | `diagnose_precipitation()` | Fused precip / storm summary |
 
-`plot_nexrad_level2` is intentionally **not** mapped into state. It returns a PNG path for the briefing UI/filesystem, not inputs for diagnosis.
+`plot_nexrad_level2` and `plot_metar_observations` are intentionally **not** mapped into state. They return PNG paths for the briefing UI/filesystem, not inputs for diagnosis.
 
 Mapping lives in `WEATHER_TOOL_STATE_MAP` in `agent.py`.
 
@@ -183,6 +183,7 @@ Registered tools (order in `tools/__init__.py`):
 | `get_hrrr_environment` | `hrrr.py` | Model surface + precip-type environment |
 | `analyze_nexrad_level2` | `radar.py` | Level II moments + dual-pol |
 | `plot_nexrad_level2` | `radar.py` | Radar PNG for the briefing |
+| `plot_metar_observations` | `metar.py` | Regional METAR station-model PNG |
 | `get_lightning` | `lightning.py` | GOES GLM recent flashes |
 | `analyze_current_skewt` | `skewt.py` | Full MetPy analysis of HRRR sounding |
 | `get_gfs_guidance` | `models.py` | Latest-cycle GFS point guidance and regional charts through 72 hours |
@@ -211,6 +212,7 @@ On the next `agent` hop, `build_system_prompt` can inject that diagnosis.
 4. Post-process images:
    - `ensure_forecast_zone_markdown` — embed the NWS forecast-zone locator map near the top (**Forecast Area**, after **Headline**) via `markdown_image_url` (HTTPS when uploaded, else local path; `width="480"`)
    - `ensure_radar_image_markdown` — embed radar via `markdown_image_url` (HTTPS when uploaded, else local path)
+   - `ensure_metar_image_markdown` — embed METAR station-model plot via `markdown_image_url` (HTTPS when uploaded, else local path)
    - `ensure_gfs_guidance_markdown` — insert day 1–3 GFS charts if the model omitted them
    - `normalize_briefing_images` — convert markdown links and bare URLs to sized `<img>` tags
 5. `write_briefing_markdown` — prepend schedule metadata (**Updated** / **Next update** for the Eastern cadence: hourly 8am–8pm plus 4am overnight), write `briefings/YYYY-MM-DD_HHMM_<slug>.md`, and when `storage.upload_to_s3` is enabled upload to S3 and update `latest.txt` at the bucket root. With `--local` / `upload_to_s3: false`, only the local file is written and image embeds use local paths.

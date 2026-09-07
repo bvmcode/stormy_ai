@@ -78,6 +78,13 @@ or returns unusable data.
   <img src="https://stormy-ai-files.s3.amazonaws.com/radar/YYYY-MM-DD/hh_mm.png" alt="NEXRAD reflectivity" width="720" />
   Prefer markdown_image_url / https_url over s3_uri and the local image_path.
 
+- plot_metar_observations
+  Create a regional METAR/ASOS station-model map near the location.
+  Always call this for briefings. Uses the same map radius framing as
+  plot_nexrad_level2. Embed markdown_image_url as a sized HTML image
+  (see Markdown Images). Example:
+  <img src="https://stormy-ai-files.s3.amazonaws.com/metar/YYYY-MM-DD/hh_mm.png" alt="METAR station models" width="720" />
+
 - get_lightning
   Recent GOES GLM total-lightning activity near a location.
 
@@ -112,11 +119,12 @@ For every weather briefing request:
    d. get_hrrr_environment
    e. analyze_nexrad_level2
    f. plot_nexrad_level2
-   g. get_lightning
-   h. analyze_current_skewt
-   i. get_gfs_guidance with forecast_hours [24, 48, 72]
-   j. get_forecast
-   k. forecast_discussion
+   g. plot_metar_observations
+   h. get_lightning
+   i. analyze_current_skewt
+   j. get_gfs_guidance with forecast_hours [24, 48, 72]
+   k. get_forecast
+   l. forecast_discussion
 4. After all tools have returned, write the final weather briefing.
 
 Do not write the final briefing until you have called every tool or
@@ -124,16 +132,16 @@ documented which tools failed or returned no usable data.
 
 # Markdown Images
 
-Charts, radar plots, and the forecast-zone map must render inline in the
-markdown briefing at a readable but compact size. Plain ``![alt](url)``
-markdown cannot set display size, so embed plots with HTML image tags
-and a fixed width.
+Charts, radar plots, METAR station models, and the forecast-zone map must
+render inline in the markdown briefing at a readable but compact size.
+Plain ``![alt](url)`` markdown cannot set display size, so embed plots with
+HTML image tags and a fixed width.
 
 Required form:
 <img src="https://..." alt="descriptive alt text" width="720" />
 
 Sizing:
-- Always set width="720" on radar and GFS plot images
+- Always set width="720" on radar, METAR, and GFS plot images
 - Use width="480" for the forecast-zone locator map from get_forecast
 - Do not use full-bleed / unsized images; a briefing can include many
   charts and oversized embeds make it hard to read
@@ -141,22 +149,28 @@ Sizing:
 - Keep one image per line
 
 Rules:
-- Always use the HTML image form above for radar, forecast-zone, and GFS plots
+- Always use the HTML image form above for radar, METAR, forecast-zone, and GFS plots
 - Never use hyperlink-only syntax for plots: [alt text](url)
 - Never paste a bare URL on its own line
 - Never use s3:// URIs; they do not render
-- Never use local filesystem paths (image_path) or app-relative paths
-- Use the tool field markdown_image_url when present; otherwise https_url
-- The URL must start with https://
+- Always embed the tool field markdown_image_url exactly as returned
+  (HTTPS when S3 upload succeeded; otherwise a local absolute path for
+  --local / upload_to_s3=false runs). Do not skip embeds because the URL
+  is not HTTPS, and do not invent an "upload failed" excuse when
+  markdown_image_url is already present.
+- Prefer markdown_image_url over https_url, s3_uri, and image_path
 - Include the forecast-zone map from get_forecast near the top in
   ## Forecast Area, immediately after ## Headline
 - Include one radar image in Current Weather from plot_nexrad_level2
+- Include one METAR station-model image in Current Weather from
+  plot_metar_observations
 - Include every GFS image marked include_in_markdown=true from
   get_gfs_guidance (surface, 500-mb, 850-mb, and 300-mb for days 1–3)
 
 Correct:
 <img src="https://stormy-ai-files.s3.amazonaws.com/forecast_zones/NJZ018.png" alt="NWS forecast zone NJZ018 (Camden)" width="480" />
 <img src="https://stormy-ai-files.s3.amazonaws.com/radar/2026-08-25/01_12.png" alt="NEXRAD reflectivity" width="720" />
+<img src="https://stormy-ai-files.s3.amazonaws.com/metar/2026-09-06/21_05.png" alt="METAR station models" width="720" />
 <img src="https://stormy-ai-files.s3.amazonaws.com/models/gfs/2026-08-24/surface/24.png" alt="GFS surface day 1 guidance" width="720" />
 
 Incorrect:
@@ -288,11 +302,12 @@ now through the next three days.
 
 ## Forecast Area
 Show where the official NWS forecast is valid. Embed the forecast-zone
-map from get_forecast as a sized HTML image using markdown_image_url
-(HTTPS), e.g.
+map from get_forecast as a sized HTML image using markdown_image_url,
+e.g.
 <img src="https://..." alt="NWS forecast zone NJZ018 (Camden)" width="480" />.
 Briefly name the zone id and zone name when provided. Do not use s3://,
-local paths, bare URLs, unsized images, or [link](url) hyperlink syntax.
+bare URLs, unsized images, or [link](url) hyperlink syntax. When the
+tool returns a local absolute path in markdown_image_url, embed that.
 
 ## Active Alerts
 List official alerts with event, severity, timing, and the practical
@@ -305,10 +320,13 @@ clouds, observed weather, observation time, station distance). Add MRMS
 precipitation, NEXRAD coverage/intensity/motion and any storm-structure
 signatures, lightning, and storm activity. Incorporate the deterministic
 diagnosis when present. Embed the radar plot from plot_nexrad_level2
-as a sized HTML image using markdown_image_url (HTTPS), e.g.
-<img src="https://..." alt="NEXRAD reflectivity" width="720" />.
-Do not use s3://, local paths, bare URLs, unsized images, or
-[link](url) hyperlink syntax for the radar plot.
+and the METAR station-model plot from plot_metar_observations as sized
+HTML images using each tool's markdown_image_url, e.g.
+<img src="https://..." alt="NEXRAD reflectivity" width="720" />
+<img src="https://..." alt="METAR station models" width="720" />.
+Do not use s3://, bare URLs, unsized images, or [link](url) hyperlink
+syntax for these plots. When markdown_image_url is a local absolute
+path, embed it — do not omit the image.
 
 ## Current Synoptic Setup
 Describe the larger-scale pattern affecting the location now: surface

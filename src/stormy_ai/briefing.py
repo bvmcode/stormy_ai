@@ -44,14 +44,15 @@ def build_briefing_request(location: str) -> str:
         "Geocode the location first, then call every available tool: "
         "get_alerts, current_conditions, get_mrms_precipitation, "
         "get_hrrr_environment, analyze_nexrad_level2, plot_nexrad_level2, "
-        "get_lightning, analyze_current_skewt, get_gfs_guidance, "
-        "get_forecast, and forecast_discussion. For GFS guidance use "
-        "day-one, day-two, and day-three forecast hours 24, 48, and 72. "
+        "plot_metar_observations, get_lightning, analyze_current_skewt, "
+        "get_gfs_guidance, get_forecast, and forecast_discussion. For GFS "
+        "guidance use day-one, day-two, and day-three forecast hours 24, 48, "
+        "and 72. "
         "Write the final briefing only after all tools have been used. "
         "Do not include a top-level title, issued-for header, or status "
         "preamble; start directly with ## Headline. "
-        "Embed radar and GFS charts as sized HTML images using each tool's "
-        "markdown_image_url, for example "
+        "Embed radar, METAR, and GFS charts as sized HTML images using each "
+        "tool's markdown_image_url, for example "
         f'<img src="https://..." alt="..." width="{image_width}" />; '
         "also embed get_forecast's forecast-zone map near the top using its "
         "markdown_image_url. "
@@ -168,6 +169,48 @@ def extract_radar_plot_path(messages) -> Path | None:
     return extract_radar_plot_info(messages)["radar_plot_path"]
 
 
+def extract_metar_plot_info(messages) -> dict:
+    """
+    Return local path and public image URL for the latest METAR plot tool result.
+    """
+
+    metar_path = None
+    metar_s3_uri = None
+    metar_image_url = None
+
+    for message in messages:
+        if not isinstance(message, ToolMessage):
+            continue
+
+        if message.name != "plot_metar_observations":
+            continue
+
+        result = parse_tool_content(message.content)
+        if not result:
+            continue
+
+        if result.get("image_path"):
+            metar_path = Path(result["image_path"])
+
+        if result.get("s3_uri"):
+            metar_s3_uri = result["s3_uri"]
+
+        if result.get("markdown_image_url"):
+            metar_image_url = result["markdown_image_url"]
+        elif result.get("https_url"):
+            metar_image_url = result["https_url"]
+        elif result.get("s3_uri"):
+            metar_image_url = s3_uri_to_https_url(result["s3_uri"])
+        elif result.get("image_path"):
+            metar_image_url = str(Path(result["image_path"]).resolve())
+
+    return {
+        "metar_plot_path": metar_path,
+        "metar_s3_uri": metar_s3_uri,
+        "metar_image_url": metar_image_url,
+    }
+
+
 def extract_gfs_guidance(messages) -> dict | None:
     """Return the latest structured GFS tool result, if one exists."""
 
@@ -261,6 +304,53 @@ def ensure_radar_image_markdown(
 
     if image_line in text or image_url in text:
         return text
+
+    match = re.search(r"(## Current Weather\s*\n)", text)
+    if match:
+        insert_at = match.end()
+        return text[:insert_at] + "\n" + image_line + "\n" + text[insert_at:]
+
+    return image_line + "\n\n" + text
+
+
+def ensure_metar_image_markdown(
+    briefing_text: str,
+    image_url: str | None,
+) -> str:
+    """
+    Ensure the briefing embeds the METAR station-model plot in Current Weather.
+    """
+
+    text = normalize_briefing_images(briefing_text.strip())
+    image_url = public_image_url(image_url)
+
+    if not image_url:
+        return text
+
+    image_line = format_briefing_image("METAR station models", image_url)
+
+    if image_url in text:
+        return text
+
+    text = re.sub(
+        rf"(?m)^\s*{re.escape(image_url)}\s*$",
+        image_line,
+        text,
+        count=1,
+    )
+
+    if image_line in text or image_url in text:
+        return text
+
+    # Prefer placing METAR after an already-embedded radar image.
+    radar_img = re.search(
+        r'(<img\s+[^>]*alt="NEXRAD reflectivity"[^>]*/?>)',
+        text,
+        re.IGNORECASE,
+    )
+    if radar_img:
+        insert_at = radar_img.end()
+        return text[:insert_at] + "\n\n" + image_line + text[insert_at:]
 
     match = re.search(r"(## Current Weather\s*\n)", text)
     if match:
@@ -451,6 +541,8 @@ def write_briefing_markdown(
     gfs_guidance: dict | None = None,
     *,
     radar_s3_uri: str | None = None,
+    metar_image_url: str | None = None,
+    metar_s3_uri: str | None = None,
     forecast_zone_image_url: str | None = None,
     forecast_zone_id: str | None = None,
     forecast_zone_name: str | None = None,
@@ -480,6 +572,10 @@ def write_briefing_markdown(
     body = ensure_radar_image_markdown(
         body,
         radar_image_url or radar_s3_uri,
+    )
+    body = ensure_metar_image_markdown(
+        body,
+        metar_image_url or metar_s3_uri,
     )
     body = ensure_gfs_guidance_markdown(body, gfs_guidance)
 
@@ -545,9 +641,11 @@ def run_briefing(location: str | None = None) -> dict:
 
     messages = result["messages"]
     radar_info = extract_radar_plot_info(messages)
+    metar_info = extract_metar_plot_info(messages)
     forecast_zone_info = extract_forecast_zone_info(messages)
     gfs_guidance = extract_gfs_guidance(messages)
     radar_image_url = radar_info["radar_image_url"] or radar_info["radar_s3_uri"]
+    metar_image_url = metar_info["metar_image_url"] or metar_info["metar_s3_uri"]
     forecast_zone_image_url = (
         forecast_zone_info["forecast_zone_image_url"] or forecast_zone_info["forecast_zone_s3_uri"]
     )
@@ -562,6 +660,10 @@ def run_briefing(location: str | None = None) -> dict:
         briefing_text,
         radar_image_url,
     )
+    briefing_text = ensure_metar_image_markdown(
+        briefing_text,
+        metar_image_url,
+    )
     briefing_text = ensure_gfs_guidance_markdown(
         briefing_text,
         gfs_guidance,
@@ -571,6 +673,7 @@ def run_briefing(location: str | None = None) -> dict:
         briefing_text,
         radar_image_url=radar_image_url,
         gfs_guidance=gfs_guidance,
+        metar_image_url=metar_image_url,
         forecast_zone_image_url=forecast_zone_image_url,
         forecast_zone_id=forecast_zone_info["forecast_zone_id"],
         forecast_zone_name=forecast_zone_info["forecast_zone_name"],
@@ -587,6 +690,9 @@ def run_briefing(location: str | None = None) -> dict:
         "radar_plot_path": radar_info["radar_plot_path"],
         "radar_s3_uri": radar_info["radar_s3_uri"],
         "radar_image_url": radar_image_url,
+        "metar_plot_path": metar_info["metar_plot_path"],
+        "metar_s3_uri": metar_info["metar_s3_uri"],
+        "metar_image_url": metar_image_url,
         "forecast_zone_image_url": forecast_zone_image_url,
         "forecast_zone_s3_uri": forecast_zone_info["forecast_zone_s3_uri"],
         "forecast_zone_id": forecast_zone_info["forecast_zone_id"],

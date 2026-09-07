@@ -18,7 +18,7 @@ Each run produces a structured **weather briefing** with:
 - Outlook from the forecast discussion
 - Day-by-day forecast for the next three days
 
-Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the EventBridge cadence (hourly 8am–8pm US Eastern, plus 4am overnight). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
+Briefings are written locally under `briefings/` and, by default, uploaded to S3. Each saved file includes **Updated** and **Next update** times aligned to the EventBridge cadence (hourly 8am–8pm US Eastern, plus 4am overnight). After upload, a bucket-root `latest.txt` pointer is updated with the newest briefing `s3://` URI. Radar PNGs from `plot_nexrad_level2`, METAR station-model PNGs from `plot_metar_observations`, GFS chart PNGs from `get_gfs_guidance`, and cached forecast-zone maps from `get_forecast` are uploaded to the same bucket. Embedded images in the markdown use public HTTPS URLs. Pass `--local` (or set `storage.upload_to_s3: false`) to keep briefings and plots on disk only.
 
 ---
 
@@ -79,7 +79,7 @@ python main.py --local             # local files only; skip S3 uploads
 python main.py --local "Denver, CO"
 ```
 
-The CLI prints the briefing and writes a timestamped file under `briefings/`. With S3 uploads enabled (default), it also uploads the briefing and plot images when credentials are available, and updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags (zone maps use `width="480"`; radar/GFS use `720`) — public HTTPS URLs when uploaded, otherwise local absolute paths. With `--local`, artifacts stay under `briefings/`, `radar_plots/`, `model_plots/`, and `forecast_zones/`.
+The CLI prints the briefing and writes a timestamped file under `briefings/`. With S3 uploads enabled (default), it also uploads the briefing and plot images when credentials are available, and updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags (zone maps use `width="480"`; radar/GFS use `720`) — public HTTPS URLs when uploaded, otherwise local absolute paths. With `--local`, artifacts stay under `briefings/`, `radar_plots/`, `metar_plots/`, `model_plots/`, and `forecast_zones/`.
 
 ---
 
@@ -116,7 +116,7 @@ docker run --rm \
   wx_briefing_agent "Denver, CO"
 ```
 
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the EventBridge Scheduler cadence (hourly 8am–8pm ET, overnight every 6 hours).
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for ECR push, ECS Fargate, and the EventBridge Scheduler cadence (hourly 8am–8pm ET, plus 4am overnight).
 
 ---
 
@@ -166,6 +166,7 @@ Environment variables override `config.yaml` when set:
 | `BRIEFING_DIR` | `briefings` | Local markdown output directory |
 | `BRIEFING_IMAGE_WIDTH` | `720` | Default width (px) for embedded `<img>` tags (forecast-zone maps use `480`) |
 | `RADAR_PLOT_DIR` | `radar_plots` | Local NEXRAD PNG directory |
+| `METAR_PLOT_DIR` | `metar_plots` | Local METAR station-model PNG directory |
 | `GFS_MODEL_PLOT_DIR` | `model_plots` | Local GFS chart PNG directory |
 | `FORECAST_ZONE_PLOT_DIR` | `forecast_zones` | Local forecast-zone PNG cache directory |
 | `STORMY_UPLOAD_TO_S3` | `true` | Upload briefings/plots to S3 (`false` = same as `--local`) |
@@ -174,6 +175,8 @@ Environment variables override `config.yaml` when set:
 | `BRIEFING_LATEST_S3_KEY` | `latest.txt` | Bucket-root key holding the newest briefing `s3://` URI |
 | `RADAR_S3_BUCKET` | `stormy-ai-files` | S3 bucket for radar plot uploads |
 | `RADAR_S3_PREFIX` | `radar` | Key prefix for radar PNGs |
+| `METAR_S3_BUCKET` | `stormy-ai-files` | S3 bucket for METAR plot uploads |
+| `METAR_S3_PREFIX` | `metar` | Key prefix for METAR PNGs |
 | `GFS_S3_BUCKET` | `stormy-ai-files` | S3 bucket for GFS chart uploads |
 | `GFS_S3_PREFIX` | `models/gfs` | Key prefix for GFS chart uploads |
 | `FORECAST_ZONE_S3_BUCKET` | same as briefing bucket | S3 bucket for cached forecast-zone PNGs |
@@ -188,11 +191,12 @@ S3 object layout:
 s3://stormy-ai-files/briefings/<YYYY-MM-DD>/<zip_code>/<HH_MM>.md
 s3://stormy-ai-files/latest.txt                              ← s3:// URI of newest briefing
 s3://stormy-ai-files/radar/<YYYY-MM-DD>/<HH>_<MM>.png
+s3://stormy-ai-files/metar/<YYYY-MM-DD>/<HH>_<MM>.png
 s3://stormy-ai-files/models/gfs/<YYYY-MM-DD>/<image_type>/<forecast_hour>.png
 s3://stormy-ai-files/forecast_zones/<ZONE_ID>.png            ← cached; reused across briefings
 ```
 
-Public embeds require a bucket policy that allows `s3:GetObject` on `briefings/*`, `radar/*`, `models/*`, and `forecast_zones/*`.
+Public embeds require a bucket policy that allows `s3:GetObject` on `briefings/*`, `radar/*`, `metar/*`, `models/*`, and `forecast_zones/*`.
 
 No API keys are required for NWS, Open-Meteo geocoding, MRMS, HRRR (via Herbie), NEXRAD, or GLM open data. The NWS client sends a fixed User-Agent.
 
@@ -223,6 +227,7 @@ uv run python -m unittest discover -s tests -v
 | `get_gfs_guidance` | Latest coherent GFS cycle, point guidance, and day 1–3 surface/500/850/300-mb charts |
 | `analyze_nexrad_level2` | Site radar structure and dual-pol detail |
 | `plot_nexrad_level2` | Radar image for the briefing (local; S3 when uploads enabled) |
+| `plot_metar_observations` | Regional METAR/ASOS station-model map |
 | `get_lightning` | Recent GLM total-lightning activity |
 | `analyze_current_skewt` | Full MetPy sounding analysis from HRRR |
 
@@ -249,6 +254,7 @@ stormy_ai/
 ├── tests/                  Unit tests
 ├── briefings/              Generated markdown briefings
 ├── radar_plots/            Generated radar PNGs
+├── metar_plots/            Generated METAR station-model PNGs
 ├── model_plots/            Generated regional GFS chart PNGs
 ├── forecast_zones/         Cached forecast-zone PNGs (local)
 └── src/stormy_ai/
@@ -276,6 +282,7 @@ stormy_ai/
 | [`docs/tools/HRRR.md`](docs/tools/HRRR.md) | Model environment and precip-type guidance |
 | [`docs/tools/GFS.md`](docs/tools/GFS.md) | GFS point guidance and regional charts |
 | [`docs/tools/NEXRAD.md`](docs/tools/NEXRAD.md) | Level II analysis and plots |
+| [`docs/tools/METAR.md`](docs/tools/METAR.md) | Regional METAR station-model plots |
 | [`docs/tools/LIGHTNING.md`](docs/tools/LIGHTNING.md) | GOES GLM |
 | [`docs/tools/SKEWT.md`](docs/tools/SKEWT.md) | HRRR model sounding + MetPy |
 | [`docs/tools/DIAGNOSTICS.md`](docs/tools/DIAGNOSTICS.md) | Deterministic multi-source fusion |
