@@ -80,7 +80,7 @@ Stormy AI adds optional meteorological fields for the **current turn**:
 | `lightning` | `get_lightning` | GLM flash activity |
 | `diagnosis` | `diagnose_precipitation()` | Fused precip / storm summary |
 
-`plot_nexrad_level2` is intentionally **not** mapped into state. It returns a PNG path for the briefing UI/filesystem, not inputs for diagnosis.
+`plot_nexrad_level2` and `plot_metar_observations` are intentionally **not** mapped into state. They return PNG paths for the briefing UI/filesystem, not inputs for diagnosis.
 
 Mapping lives in `WEATHER_TOOL_STATE_MAP` in `agent.py`.
 
@@ -183,6 +183,7 @@ Registered tools (order in `tools/__init__.py`):
 | `get_hrrr_environment` | `hrrr.py` | Model surface + precip-type environment |
 | `analyze_nexrad_level2` | `radar.py` | Level II moments + dual-pol |
 | `plot_nexrad_level2` | `radar.py` | Radar PNG for the briefing |
+| `plot_metar_observations` | `metar.py` | Regional METAR station-model PNG |
 | `get_lightning` | `lightning.py` | GOES GLM recent flashes |
 | `analyze_current_skewt` | `skewt.py` | Full MetPy analysis of HRRR sounding |
 | `get_gfs_guidance` | `models.py` | Latest-cycle GFS point guidance and regional charts through 72 hours |

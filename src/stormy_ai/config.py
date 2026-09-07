@@ -88,6 +88,7 @@ class PathsConfig:
     radar_plot_dir: str
     gfs_model_plot_dir: str
     forecast_zone_plot_dir: str
+    metar_plot_dir: str
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class StorageConfig:
     latest_s3_key: str
     radar_prefix: str
     gfs_prefix: str
+    metar_prefix: str
     public_base_url: str
     upload_to_s3: bool
 
@@ -175,6 +177,8 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         paths["gfs_model_plot_dir"] = gfs_dir
     if forecast_zone_dir := os.environ.get("FORECAST_ZONE_PLOT_DIR"):
         paths["forecast_zone_plot_dir"] = forecast_zone_dir
+    if metar_dir := os.environ.get("METAR_PLOT_DIR"):
+        paths["metar_plot_dir"] = metar_dir
     raw["paths"] = paths
 
     storage = _section(raw, "storage")
@@ -188,6 +192,8 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         storage["radar_prefix"] = radar_prefix
     if gfs_prefix := os.environ.get("GFS_S3_PREFIX"):
         storage["gfs_prefix"] = gfs_prefix
+    if metar_prefix := os.environ.get("METAR_S3_PREFIX"):
+        storage["metar_prefix"] = metar_prefix
     if public_base := os.environ.get("STORMY_S3_PUBLIC_BASE"):
         storage["public_base_url"] = public_base
     if upload_to_s3 := os.environ.get("STORMY_UPLOAD_TO_S3"):
@@ -239,6 +245,7 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
             forecast_zone_plot_dir=str(
                 paths_raw.get("forecast_zone_plot_dir", "forecast_zones")
             ),
+            metar_plot_dir=str(paths_raw.get("metar_plot_dir", "metar_plots")),
         ),
         storage=StorageConfig(
             s3_bucket=str(storage_raw.get("s3_bucket", "stormy-ai-files")),
@@ -246,6 +253,7 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
             latest_s3_key=str(storage_raw.get("latest_s3_key", "latest.txt")),
             radar_prefix=str(storage_raw.get("radar_prefix", "radar")),
             gfs_prefix=str(storage_raw.get("gfs_prefix", "models/gfs")),
+            metar_prefix=str(storage_raw.get("metar_prefix", "metar")),
             public_base_url=str(storage_raw.get("public_base_url", "")),
             upload_to_s3=_parse_bool(
                 storage_raw.get("upload_to_s3", True),

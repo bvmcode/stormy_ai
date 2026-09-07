@@ -60,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /app /app
 
-RUN mkdir -p briefings radar_plots model_plots /home/app/.cache/metpy /home/app/.cache/matplotlib \
+RUN mkdir -p briefings radar_plots model_plots metar_plots /home/app/.cache/metpy /home/app/.cache/matplotlib \
     && useradd --create-home --uid 10001 --shell /usr/sbin/nologin app \
     && chown -R app:app /app /home/app
 

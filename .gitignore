@@ -22,4 +22,5 @@ infra/*.tfvars
 briefings/
 radar_plots/
 model_plots/
+metar_plots/
 forecast_zones/

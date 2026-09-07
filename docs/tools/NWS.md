@@ -7,6 +7,7 @@ Module: `src/stormy_ai/tools/nws.py`
 | Tool | Role |
 |------|------|
 | `current_conditions` | Latest METAR/ASOS observation from the nearest station |
+| `plot_metar_observations` | Regional station-model map of surrounding METARs ([`METAR.md`](METAR.md)) |
 | `get_forecast` | 12-hour periods + hourly forecast (~72 hours) plus a cached forecast-zone map |
 | `forecast_discussion` | Latest Area Forecast Discussion from the local WFO |
 | `get_alerts` | Active alerts intersecting a point |

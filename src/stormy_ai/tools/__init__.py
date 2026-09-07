@@ -1,6 +1,7 @@
 from .geocode import geocode_location
 from .hrrr import get_hrrr_environment
 from .lightning import get_lightning
+from .metar import plot_metar_observations
 from .models import get_gfs_guidance
 from .mrms import get_mrms_precipitation
 from .nws import (
@@ -22,6 +23,7 @@ tools = [
     get_hrrr_environment,
     analyze_nexrad_level2,
     plot_nexrad_level2,
+    plot_metar_observations,
     get_lightning,
     analyze_current_skewt,
     get_gfs_guidance,
@@ -37,6 +39,7 @@ __all__ = [
     "get_hrrr_environment",
     "analyze_nexrad_level2",
     "plot_nexrad_level2",
+    "plot_metar_observations",
     "get_lightning",
     "analyze_current_skewt",
     "get_gfs_guidance",
