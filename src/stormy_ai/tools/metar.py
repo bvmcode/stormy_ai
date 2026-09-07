@@ -485,7 +485,7 @@ def _plot_station_models(
             lat,
             sky_cover(sky_oktas),
             transform=ccrs.PlateCarree(),
-            fontsize=fontsize + 4,
+            fontsize=fontsize + 1.5,
             ha="center",
             va="center",
             color=_PLOT_TEXT,
@@ -498,7 +498,7 @@ def _plot_station_models(
             axis.annotate(
                 f"{obs['temperature_f']:.0f}",
                 xy=location,
-                xytext=(-16, 11),
+                xytext=(-10, 7),
                 textcoords="offset points",
                 color=_TEMP_COLOR,
                 fontsize=fontsize,
@@ -513,7 +513,7 @@ def _plot_station_models(
             axis.annotate(
                 f"{obs['dewpoint_f']:.0f}",
                 xy=location,
-                xytext=(-16, -13),
+                xytext=(-10, -8),
                 textcoords="offset points",
                 color=_DEWPOINT_COLOR,
                 fontsize=fontsize,
@@ -527,7 +527,7 @@ def _plot_station_models(
             axis.annotate(
                 _pressure_station_code(obs["pressure_mb"]),
                 xy=location,
-                xytext=(12, 11),
+                xytext=(8, 7),
                 textcoords="offset points",
                 color=_PRESSURE_COLOR,
                 fontsize=fontsize,
@@ -540,7 +540,7 @@ def _plot_station_models(
         axis.annotate(
             obs["station_id"],
             xy=location,
-            xytext=(12, -13),
+            xytext=(8, -8),
             textcoords="offset points",
             color=_PLOT_TEXT,
             fontsize=fontsize - 0.5,
@@ -557,12 +557,12 @@ def _plot_station_models(
                 np.array([lat]),
                 np.array([obs["wind_u_kt"]]),
                 np.array([obs["wind_v_kt"]]),
-                length=5.5,
-                linewidth=0.9,
+                length=5.0,
+                linewidth=0.85,
                 color=_PLOT_TEXT,
                 transform=ccrs.PlateCarree(),
                 zorder=4,
-                sizes={"emptybarb": 0.15},
+                sizes={"emptybarb": 0.12},
             )
 
 

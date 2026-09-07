@@ -153,9 +153,12 @@ Rules:
 - Never use hyperlink-only syntax for plots: [alt text](url)
 - Never paste a bare URL on its own line
 - Never use s3:// URIs; they do not render
-- Never use local filesystem paths (image_path) or app-relative paths
-- Use the tool field markdown_image_url when present; otherwise https_url
-- The URL must start with https://
+- Always embed the tool field markdown_image_url exactly as returned
+  (HTTPS when S3 upload succeeded; otherwise a local absolute path for
+  --local / upload_to_s3=false runs). Do not skip embeds because the URL
+  is not HTTPS, and do not invent an "upload failed" excuse when
+  markdown_image_url is already present.
+- Prefer markdown_image_url over https_url, s3_uri, and image_path
 - Include the forecast-zone map from get_forecast near the top in
   ## Forecast Area, immediately after ## Headline
 - Include one radar image in Current Weather from plot_nexrad_level2
@@ -299,11 +302,12 @@ now through the next three days.
 
 ## Forecast Area
 Show where the official NWS forecast is valid. Embed the forecast-zone
-map from get_forecast as a sized HTML image using markdown_image_url
-(HTTPS), e.g.
+map from get_forecast as a sized HTML image using markdown_image_url,
+e.g.
 <img src="https://..." alt="NWS forecast zone NJZ018 (Camden)" width="480" />.
 Briefly name the zone id and zone name when provided. Do not use s3://,
-local paths, bare URLs, unsized images, or [link](url) hyperlink syntax.
+bare URLs, unsized images, or [link](url) hyperlink syntax. When the
+tool returns a local absolute path in markdown_image_url, embed that.
 
 ## Active Alerts
 List official alerts with event, severity, timing, and the practical
@@ -317,11 +321,12 @@ precipitation, NEXRAD coverage/intensity/motion and any storm-structure
 signatures, lightning, and storm activity. Incorporate the deterministic
 diagnosis when present. Embed the radar plot from plot_nexrad_level2
 and the METAR station-model plot from plot_metar_observations as sized
-HTML images using each tool's markdown_image_url (HTTPS), e.g.
+HTML images using each tool's markdown_image_url, e.g.
 <img src="https://..." alt="NEXRAD reflectivity" width="720" />
 <img src="https://..." alt="METAR station models" width="720" />.
-Do not use s3://, local paths, bare URLs, unsized images, or
-[link](url) hyperlink syntax for these plots.
+Do not use s3://, bare URLs, unsized images, or [link](url) hyperlink
+syntax for these plots. When markdown_image_url is a local absolute
+path, embed it — do not omit the image.
 
 ## Current Synoptic Setup
 Describe the larger-scale pattern affecting the location now: surface
