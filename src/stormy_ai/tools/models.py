@@ -630,7 +630,8 @@ def _plot_surface(
     axis.text(
         0.01,
         0.015,
-        "MSLP: solid black (4 hPa)  •  thickness: dashed (dam); 540 dam bold blue  •  10 m wind barbs: kt",
+        "MSLP: solid black (4 hPa)  •  thickness: dashed (dam); "
+        "540 dam bold blue  •  10 m wind barbs: kt",
         transform=axis.transAxes,
         fontsize=7.5,
         color="#1f2937",
@@ -889,7 +890,8 @@ def _render_image(
     figure.text(
         0.5,
         0.915,
-        f"Init {_plot_time_label(cycle)}  •  Valid {_plot_time_label(valid_time)}  •  F{forecast_hour:03d}",
+        f"Init {_plot_time_label(cycle)}  •  "
+        f"Valid {_plot_time_label(valid_time)}  •  F{forecast_hour:03d}",
         ha="center",
         va="center",
         fontsize=10,

@@ -42,6 +42,7 @@ _configure_langsmith_env()
 
 
 def _find_config_path() -> Path:
+    """Find the config.yaml file."""
     env_path = os.environ.get("STORMY_CONFIG")
     if env_path:
         return Path(env_path).expanduser().resolve()
@@ -111,11 +112,17 @@ class Settings:
 
 
 def _section(data: dict[str, Any], key: str) -> dict[str, Any]:
+    """
+    Get a section from the config.
+    """
     value = data.get(key, {})
     return value if isinstance(value, dict) else {}
 
 
 def _parse_schedule_hours(value: Any) -> tuple[int, ...]:
+    """
+    Parse the schedule hours from the config.
+    """
     if value is None:
         return (4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
     if not isinstance(value, (list, tuple)):
@@ -124,6 +131,9 @@ def _parse_schedule_hours(value: Any) -> tuple[int, ...]:
 
 
 def _parse_bool(value: Any, *, field_name: str) -> bool:
+    """
+    Parse a boolean value from the config.
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -136,6 +146,9 @@ def _parse_bool(value: Any, *, field_name: str) -> bool:
 
 
 def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
+    """
+    Apply environment overrides to the raw config.
+    """
     llm = _section(raw, "llm")
     ollama = _section(llm, "ollama")
     huggingface = _section(llm, "huggingface")
@@ -201,6 +214,9 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
+    """
+    Parse the settings from the raw config.
+    """
     llm_raw = _section(raw, "llm")
     ollama_raw = _section(llm_raw, "ollama")
     hf_raw = _section(llm_raw, "huggingface")
@@ -236,9 +252,7 @@ def _parse_settings(raw: dict[str, Any], config_path: Path) -> Settings:
         paths=PathsConfig(
             radar_plot_dir=str(paths_raw.get("radar_plot_dir", "radar_plots")),
             gfs_model_plot_dir=str(paths_raw.get("gfs_model_plot_dir", "model_plots")),
-            forecast_zone_plot_dir=str(
-                paths_raw.get("forecast_zone_plot_dir", "forecast_zones")
-            ),
+            forecast_zone_plot_dir=str(paths_raw.get("forecast_zone_plot_dir", "forecast_zones")),
         ),
         storage=StorageConfig(
             s3_bucket=str(storage_raw.get("s3_bucket", "stormy-ai-files")),

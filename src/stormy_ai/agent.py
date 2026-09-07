@@ -66,6 +66,7 @@ def run_tools(state: WeatherState):
     gc.collect()
     return result
 
+
 # These are the tools whose output should be captured
 # for deterministic precipitation diagnosis.
 # plot_nexrad_level2 is intentionally NOT here because

@@ -17,7 +17,7 @@ AWS_REGION ?= us-east-1
 ECR_REPOSITORY_NAME := wx_briefing_agent
 IMAGE := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY_NAME):latest
 
-.PHONY: help build create auth push build_and_push create_repo local_run shell exec_shell test-creds test lint format infra-bootstrap infra-init infra-plan infra-apply infra-run-task
+.PHONY: help build create auth push build_and_push create_repo local_run shell exec_shell test-creds test lint format infra-bootstrap infra-init infra-plan infra-apply infra-run-agent local-run-agent
 
 help: ## Show available make targets
 	@echo "Stormy AI — make targets"
@@ -77,12 +77,13 @@ test-creds: ## Print HF_TOKEN and AWS creds loaded by the Makefile (debug)
 test: ## Run the test suite
 	uv run pytest tests/
 
-lint: ## Run flake8 and isort check on src/ and tests/
+lint: ## Check flake8, isort, and black on src/ and tests/
 	uv run flake8 --config .flake8 src/ tests/
-	uv run isort --check-only src/ tests/
+	uv run isort --check-only --profile black src/ tests/
+	uv run black --check --line-length 100 src/ tests/
 
 format: ## Auto-format with black and isort
-	uv run black -l 100 src/ tests/
+	uv run black --line-length 100 src/ tests/
 	uv run isort --profile black src/ tests/
 
 INFRA_DIR := infra

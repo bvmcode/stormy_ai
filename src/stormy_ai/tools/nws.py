@@ -66,7 +66,7 @@ def _qv_value(quantity) -> float | None:
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -254,11 +254,11 @@ def _place_label_candidates(
             continue
         try:
             rank = int(attrs.get("SCALERANK") or 10)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             rank = 10
         try:
             population = int(attrs.get("POP_MAX") or attrs.get("POP_MIN") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             population = 0
         # Skip tiny hamlets that only clutter a regional map.
         if rank > 8 and population < 25000:
@@ -280,8 +280,7 @@ def _select_place_labels(
     selected: list[tuple[str, float, float]] = []
     for name, lon, lat, _rank, _population in candidates:
         if any(
-            abs(lon - other_lon) < min_separation_deg
-            and abs(lat - other_lat) < min_separation_deg
+            abs(lon - other_lon) < min_separation_deg and abs(lat - other_lat) < min_separation_deg
             for _, other_lon, other_lat in selected
         ):
             continue
@@ -538,9 +537,7 @@ class NwsApi:
                         "zone_id": zone_id,
                         "zone_name": zone_name,
                         "zone_state": zone_state,
-                        "image_path": (
-                            str(local_path.resolve()) if local_path.is_file() else None
-                        ),
+                        "image_path": (str(local_path.resolve()) if local_path.is_file() else None),
                         "s3_uri": s3_uri,
                         "https_url": https_url,
                         "markdown_image_url": https_url,

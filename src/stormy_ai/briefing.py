@@ -549,8 +549,7 @@ def run_briefing(location: str | None = None) -> dict:
     gfs_guidance = extract_gfs_guidance(messages)
     radar_image_url = radar_info["radar_image_url"] or radar_info["radar_s3_uri"]
     forecast_zone_image_url = (
-        forecast_zone_info["forecast_zone_image_url"]
-        or forecast_zone_info["forecast_zone_s3_uri"]
+        forecast_zone_info["forecast_zone_image_url"] or forecast_zone_info["forecast_zone_s3_uri"]
     )
     briefing_text = strip_llm_briefing_preamble(message_text(messages[-1].content))
     briefing_text = ensure_forecast_zone_markdown(

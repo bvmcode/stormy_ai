@@ -73,8 +73,7 @@ class RadarPlotHelpersTest(unittest.TestCase):
             None
             if station == "KCRI"
             else (
-                "s3://unidata-nexrad-level2/2026/09/05/"
-                f"{station}/{station}20260905_120000_V06"
+                "s3://unidata-nexrad-level2/2026/09/05/" f"{station}/{station}20260905_120000_V06"
             )
         )
         mock_read.return_value = object()

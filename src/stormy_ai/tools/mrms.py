@@ -1,10 +1,9 @@
+import gc
 import gzip
-import json
 import os
 import re
 import shutil
 import tempfile
-import gc
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
