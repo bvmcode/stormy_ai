@@ -58,9 +58,7 @@ def configure_logging(level: str | int | None = None) -> None:
     if isinstance(level, int):
         resolved = level
     else:
-        resolved = _parse_level(
-            level if level is not None else os.environ.get("STORMY_LOG_LEVEL")
-        )
+        resolved = _parse_level(level if level is not None else os.environ.get("STORMY_LOG_LEVEL"))
 
     root = logging.getLogger()
     root.handlers.clear()
