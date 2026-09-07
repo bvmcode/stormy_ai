@@ -1,11 +1,19 @@
-AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
-AWS_ACCESS_KEY_ID := $(shell aws configure export-credentials | jq -r '.AccessKeyId')
-AWS_SECRET_ACCESS_KEY := $(shell aws configure export-credentials | jq -r '.SecretAccessKey')
-HF_TOKEN := $(shell grep '^HF_TOKEN=' .env 2>/dev/null | cut -d '=' -f 2-)
-LANGSMITH_API_KEY := $(shell grep '^LANGSMITH_API_KEY=' .env 2>/dev/null | cut -d '=' -f 2-)
-LANGSMITH_PROJECT := $(or $(shell grep '^LANGSMITH_PROJECT=' .env 2>/dev/null | cut -d '=' -f 2- | head -1),stormy-ai)
-LANGSMITH_TRACING_ENABLED := $(shell grep -q '^LANGSMITH_TRACING=true' .env 2>/dev/null && echo true || echo false)
-AWS_REGION := us-east-1
+# Prefer env vars (GitHub Actions / CI); fall back to local aws configure and .env.
+AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text)
+AWS_ACCESS_KEY_ID ?= $(shell aws configure export-credentials | jq -r '.AccessKeyId')
+AWS_SECRET_ACCESS_KEY ?= $(shell aws configure export-credentials | jq -r '.SecretAccessKey')
+HF_TOKEN ?= $(shell grep '^HF_TOKEN=' .env 2>/dev/null | cut -d '=' -f 2-)
+LANGSMITH_API_KEY ?= $(shell grep '^LANGSMITH_API_KEY=' .env 2>/dev/null | cut -d '=' -f 2-)
+LANGSMITH_PROJECT ?= $(or $(shell grep '^LANGSMITH_PROJECT=' .env 2>/dev/null | cut -d '=' -f 2- | head -1),stormy-ai)
+LANGSMITH_TRACING_ENABLED ?= $(shell \
+	if [ -n "$$LANGSMITH_TRACING" ]; then \
+		[ "$$LANGSMITH_TRACING" = "true" ] && echo true || echo false; \
+	elif grep -q '^LANGSMITH_TRACING=true' .env 2>/dev/null; then \
+		echo true; \
+	else \
+		echo false; \
+	fi)
+AWS_REGION ?= us-east-1
 ECR_REPOSITORY_NAME := wx_briefing_agent
 IMAGE := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY_NAME):latest
 
@@ -19,7 +27,7 @@ help: ## Show available make targets
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build linux/arm64 Docker image and tag for ECR
-	docker buildx build --platform linux/arm64 -t $(IMAGE) .
+	docker buildx build --platform linux/arm64 -t $(IMAGE) --load .
 
 create: ## Create the ECR repository (one-time)
 	aws ecr create-repository --repository-name $(ECR_REPOSITORY_NAME) --region $(AWS_REGION)
