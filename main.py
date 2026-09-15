@@ -1,7 +1,6 @@
 """Run the Stormy AI weather briefing agent from the command line."""
 
 import argparse
-import sys
 from time import perf_counter
 
 from stormy_ai.briefing import run_briefing
@@ -68,16 +67,28 @@ def main() -> None:
         ),
     )
 
-    print(result["briefing"])
-    print(f"\nWrote {result['briefing_path']}")
+    logger.info("cli.briefing\n%s", result["briefing"])
+    logger.info(
+        "cli.wrote %s",
+        format_kv(briefing_path=result["briefing_path"]),
+    )
     if result.get("briefing_s3_uri"):
-        print(f"Uploaded {result['briefing_s3_uri']}")
+        logger.info(
+            "cli.uploaded %s",
+            format_kv(briefing_s3_uri=result["briefing_s3_uri"]),
+        )
         if result.get("briefing_latest_s3_uri"):
-            print(f"Updated {result['briefing_latest_s3_uri']}")
+            logger.info(
+                "cli.latest_updated %s",
+                format_kv(briefing_latest_s3_uri=result["briefing_latest_s3_uri"]),
+            )
     elif args.local:
-        print("Skipped S3 upload (--local).")
+        logger.info("cli.s3_skipped reason=local")
     elif result.get("briefing_s3_upload_error"):
-        print(f"S3 upload failed: {result['briefing_s3_upload_error']}", file=sys.stderr)
+        logger.error(
+            "cli.s3_failed %s",
+            format_kv(error=result["briefing_s3_upload_error"]),
+        )
 
 
 if __name__ == "__main__":

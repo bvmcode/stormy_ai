@@ -9,16 +9,12 @@ from stormy_ai.logging_config import format_kv, get_logger
 
 logger = get_logger(__name__)
 
-# Open-Meteo geocoding converts place names to lat/lon.
-# No API key is required.
-GEOCODE_API_BASE = "https://geocoding-api.open-meteo.com/v1/search"
-ZIP_CODE_RE = re.compile(r"\s+\d{5}(?:-\d{4})?\s*$")
-
 
 def _search_names(place: str) -> list[str]:
     """Return place strings to try, stripping a trailing ZIP if needed."""
     names = [place.strip()]
-    stripped = ZIP_CODE_RE.sub("", place).strip().rstrip(",")
+    zip_code_re = re.compile(r"\s+\d{5}(?:-\d{4})?\s*$")
+    stripped = zip_code_re.sub("", place).strip().rstrip(",")
     if stripped and stripped not in names:
         names.append(stripped)
     return names
@@ -36,10 +32,11 @@ def geocode_location(place: str) -> str:
     """
     data = None
     last_error = None
+    api_url = "https://geocoding-api.open-meteo.com/v1/search"
     for name in _search_names(place):
         try:
             response = requests.get(
-                GEOCODE_API_BASE,
+                api_url,
                 params={
                     "name": name,
                     "count": 1,
