@@ -58,10 +58,10 @@ Deep dive: [`docs/AGENT.md`](docs/AGENT.md). Per-tool docs: [`docs/tools/`](docs
 ## Setup
 
 ```bash
-# Install core package + dependencies
+# Install core package + dependencies (add --group dev for LangSmith Studio / lint)
 uv sync
 
-# Copy secrets template and add HF_TOKEN if using the huggingface provider
+# Copy secrets template; add HF_TOKEN and LANGSMITH_API_KEY as needed
 cp .env.example .env
 
 # For Ollama: pull / start the model (name must match config.yaml llm.model)
@@ -80,6 +80,24 @@ python main.py --local "Denver, CO"
 ```
 
 The CLI prints the briefing and writes a timestamped file under `briefings/`. With S3 uploads enabled (default), it also uploads the briefing and plot images when credentials are available, and updates `s3://<bucket>/latest.txt` with the new briefing URI. Forecast-zone, radar, and GFS images are embedded as sized HTML `<img>` tags (zone maps use `width="480"`; radar/GFS use `720`) — public HTTPS URLs when uploaded, otherwise local absolute paths. With `--local`, artifacts stay under `briefings/`, `radar_plots/`, `metar_plots/`, `model_plots/`, and `forecast_zones/`.
+
+---
+
+## LangSmith Studio (`langgraph dev`)
+
+[`langgraph.json`](langgraph.json) registers the compiled graph (`src/stormy_ai/agent.py:graph`) so you can inspect and invoke it in [LangSmith Studio](https://docs.langchain.com/oss/python/langgraph/studio).
+
+```bash
+# Installs langgraph-cli[inmem] from the dev dependency group
+uv sync --group dev
+
+# Ensure .env has LANGSMITH_API_KEY (see .env.example)
+uv run langgraph dev
+```
+
+The CLI starts a local Agent Server and prints a Studio URL (typically `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`). In Studio, select the `agent` graph and invoke it with a `messages` input — for example a human message asking for a weather briefing for a location (same shape as `graph.invoke` in `briefing.py`).
+
+On Safari, use `uv run langgraph dev --tunnel` if Studio cannot reach `localhost`.
 
 ---
 
@@ -209,6 +227,7 @@ make help      # list all Makefile targets
 make lint      # flake8 + isort check
 make format    # black + isort
 uv run python -m unittest discover -s tests -v
+uv run langgraph dev   # LangSmith Studio (requires uv sync --group dev)
 ```
 
 ---
@@ -241,6 +260,7 @@ After MRMS and HRRR return, `diagnose_precipitation` builds the deterministic di
 stormy_ai/
 ├── main.py                 CLI entry
 ├── config.yaml             LLM, briefing, paths, and storage settings
+├── langgraph.json          LangGraph CLI / LangSmith Studio config
 ├── .env.example            Secrets template (copy to .env)
 ├── Dockerfile              Container image (linux/arm64)
 ├── Makefile                Docker build, lint, Terraform/ECS helpers
@@ -258,7 +278,7 @@ stormy_ai/
 ├── model_plots/            Generated regional GFS chart PNGs
 ├── forecast_zones/         Cached forecast-zone PNGs (local)
 └── src/stormy_ai/
-    ├── agent.py            LangGraph definition (stormy_ai.graph)
+    ├── agent.py            LangGraph definition (`graph`; Studio entry)
     ├── briefing.py         run_briefing(), markdown + optional S3 output
     ├── config.py           config.yaml loader (`upload_to_s3`, paths)
     ├── llm.py              LLM provider factory
